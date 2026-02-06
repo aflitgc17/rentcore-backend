@@ -1,0 +1,50 @@
+<h2>예약하기</h2>
+<input id="equipmentId" placeholder="장비 ID" />
+<input id="startDate" type="datetime-local" />
+<input id="endDate" type="datetime-local" />
+<button onclick="create()">예약 요청</button>
+
+<hr />
+
+<h2>내 예약</h2>
+<ul id="list"></ul>
+
+<script>
+const USER_ID = 1;
+
+async function create() {
+  await fetch('/reservations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': USER_ID
+    },
+    body: JSON.stringify({
+      equipmentId: Number(equipmentId.value),
+      startDate: startDate.value,
+      endDate: endDate.value
+    })
+  });
+  load();
+}
+
+async function load() {
+  const res = await fetch('/reservations/my', {
+    headers: { 'x-user-id': USER_ID }
+  });
+  const data = await res.json();
+
+  list.innerHTML = '';
+  data.forEach(r => {
+    const li = document.createElement('li');
+    li.innerHTML = `
+      ${r.equipment.name} |
+      ${r.status}
+      ${r.rejectReason ? `(사유: ${r.rejectReason})` : ''}
+    `;
+    list.appendChild(li);
+  });
+}
+
+load();
+</script>

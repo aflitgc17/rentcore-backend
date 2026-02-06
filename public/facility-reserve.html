@@ -1,0 +1,76 @@
+<section class="facility-page">
+
+  <!-- 상단 제목 -->
+  <div class="page-header">
+    <h1>시설 예약</h1>
+  </div>
+
+  <!-- 시설 탭 -->
+  <div class="facility-tabs">
+    <button class="active">🎬 편집실</button>
+    <button>🎤 녹음실</button>
+  </div>
+
+  <!-- 카드: 시설 설명 -->
+  <div class="card">
+    <h2>편집실 예약</h2>
+    <p class="desc">
+      영화영상학과 편집실(원화관 118호) 예약 양식입니다.
+    </p>
+
+    <div class="notice">
+      <strong>⚠ 편집실 주의사항</strong>
+      <ul>
+        <li>사용 시간은 오전 9시 30분 ~ 오후 6시까지입니다.</li>
+        <li>편집실 내 음식 섭취는 금합니다.</li>
+        <li>예약 후 사용 바랍니다.</li>
+        <li>허가된 소프트웨어 외 설치 금지</li>
+        <li>사용 종료 후 정리 정돈 필수</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 카드: 예약자 정보 -->
+  <div class="card grid-3">
+    <div>
+      <label>예약자명</label>
+      <input value="abcdef" disabled />
+    </div>
+    <div>
+      <label>학과</label>
+      <input value="영화영상학과" disabled />
+    </div>
+    <div>
+      <label>학번</label>
+      <input value="20231234" disabled />
+    </div>
+  </div>
+
+  <!-- 카드: 날짜 / 시간 -->
+  <div class="card grid-3">
+    <div>
+      <label>사용일</label>
+      <input type="date" />
+    </div>
+    <div>
+      <label>사용 시작 시간</label>
+      <input type="time" />
+    </div>
+    <div>
+      <label>사용 종료 시간</label>
+      <input type="time" />
+    </div>
+  </div>
+
+  <!-- 카드: 사용 목적 -->
+  <div class="card">
+    <label>사용 목적</label>
+    <textarea placeholder="사용 목적을 구체적으로 기입"></textarea>
+  </div>
+
+  <!-- 버튼 -->
+  <div class="submit-area">
+    <button class="primary-btn">관리자에게 예약 요청하기</button>
+  </div>
+
+</section>

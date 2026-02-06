@@ -1,0 +1,438 @@
+/* ===============================
+   Global
+================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f7f7f9;
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 260px;
+  background: #fff;
+  border-right: 1px solid #e5e7eb;
+  padding: 24px;
+}
+
+.sidebar h2 {
+  font-size: 18px;
+  margin-bottom: 24px;
+}
+
+.sidebar nav a {
+  display: block;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #333;
+}
+
+.sidebar nav a:hover {
+  background: #f1f3f9;
+}
+
+/* Content */
+#content {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+}
+
+/* ===============================
+   Page Wrapper (공통 페이지 스킨)
+================================ */
+
+.page-wrapper {
+  max-width: 1200px;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 32px;
+}
+
+/* Page */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.cart-button {
+  background: #7c6af2;
+  color: #fff;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+}
+
+.category-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.category-tabs button {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+/* Table */
+.equipment-table {
+  width: 100%;
+  background: #fff;
+  border-radius: 16px;
+  border-collapse: collapse;
+}
+
+.equipment-table th,
+.equipment-table td {
+  padding: 16px;
+  text-align: center;
+  border-bottom: 1px solid #eee;
+}
+
+.equipment-table img {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+}
+
+.btn-outline {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background: #fff;
+}
+
+.btn-cart {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #f1f3f9;
+  border: none;
+}
+
+/* ===== Facility Reservation UI ===== */
+
+.facility-page {
+  max-width: 960px;
+}
+
+.facility-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.facility-tabs button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.facility-tabs button.active {
+  background: #edeaff;
+  color: #5b4ce6;
+  border-color: #edeaff;
+}
+
+.card {
+  background: #fff;
+  padding: 24px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+}
+
+.card h2 {
+  margin: 0 0 6px;
+}
+
+.card .desc {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.notice {
+  background: #f7f7f9;
+  padding: 16px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+.notice ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+input,
+textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  font-size: 14px;
+}
+
+textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.submit-area {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.primary-btn {
+  background: #7c6af2;
+  color: #fff;
+  border: none;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+/* ===============================
+   My Reservation Page
+================================ */
+
+.my-reservation-page {
+  max-width: 1200px;
+}
+
+.my-reservation-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+/* Section Card */
+.my-reservation-section {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid #e5e7eb;
+}
+
+.my-reservation-section h2 {
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+/* Reservation Card */
+.reservation-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.reservation-card:last-child {
+  margin-bottom: 0;
+}
+
+.reservation-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.reservation-info {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+/* Status Badge */
+.reservation-status {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+.reservation-status.pending {
+  background: #f1f3f9;
+  color: #555;
+}
+
+.reservation-status.approved {
+  background: #edeaff;
+  color: #5b4ce6;
+}
+
+.reservation-status.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.reservation-status.done {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+/* Empty State */
+.my-reservation-empty {
+  text-align: center;
+  padding: 48px 0;
+  font-size: 14px;
+  color: #999;
+}
+
+
+/* ===============================
+   Facility Calendar (FullCalendar)
+================================ */
+
+/* 캘린더 카드 래퍼 */
+.calendar-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 24px;
+}
+
+/* FullCalendar 전체 폰트 & 색감 */
+.fc {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* 헤더 영역 */
+.fc-toolbar {
+  margin-bottom: 20px;
+}
+
+.fc-toolbar-title {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+/* 버튼 스타일 (prev / next / today) */
+.fc-button {
+  background: #1f2937;
+  border: none;
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.fc-button-primary:not(:disabled):hover {
+  background: #111827;
+}
+
+.fc-button-primary:disabled {
+  background: #9ca3af;
+}
+
+/* today 버튼 */
+.fc-today-button {
+  background: #6b7280;
+}
+
+/* 요일 헤더 */
+.fc-col-header-cell {
+  background: #f7f7f9;
+  font-weight: 500;
+  padding: 10px 0;
+}
+
+/* 날짜 셀 */
+.fc-daygrid-day {
+  background: #ffffff;
+}
+
+.fc-daygrid-day-number {
+  font-size: 14px;
+  padding: 8px;
+}
+
+/* 오늘 날짜 강조 */
+.fc-day-today {
+  background: #fff7ed !important;
+}
+
+/* 이벤트 (편집실 / 녹음실) */
+.fc-event {
+  border-radius: 8px;
+  padding: 2px 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* 이벤트 hover */
+.fc-event:hover {
+  opacity: 0.85;
+}
+
+/* 캘린더 테두리 정리 */
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border: 1px solid #e5e7eb;
+}
+
+/* ===============================
+   Responsive
+================================ */
+
+@media (max-width: 900px) {
+  #content {
+    padding: 16px;
+  }
+
+  .page-wrapper {
+    padding: 20px;
+  }
+
+  .my-reservation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fc-toolbar-title {
+    font-size: 18px;
+  }
+
+  .calendar-card {
+    padding: 16px;
+  }
+}

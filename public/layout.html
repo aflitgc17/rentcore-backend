@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>영화영상학과 장비 키오스크</title>
+  <link rel="stylesheet" href="/css/layout.css" />
+  <!-- FullCalendar CSS -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css"
+    rel="stylesheet"
+  />
+
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <h2>영화영상학과<br>장비 키오스크</h2>
+      <nav>
+        <a href="/equipments.html" data-link>장비 목록</a>
+        <a href="/facility-reserve.html" data-link>시설 예약</a>
+        <a href="/my-reservations.html" data-link>나의 대여/예약</a>
+        <a href="/facility-calendar.html" data-link>시설 예약 캘린더</a>
+        <a
+          class="sidebar-link"
+          href="https://ia.sunmoon.ac.kr/ia/index.do"
+          target="_blank"
+          rel="noopener noreferrer">
+          영화영상학과 홈페이지
+        </a>
+
+      </nav>
+    </aside>
+
+    <!-- 여기만 바뀜 -->
+    <main id="content"></main>
+  </div>
+
+  <!-- FullCalendar (전역 1회 로드) -->
+<link
+  href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css"
+  rel="stylesheet"
+/>
+
+<!-- FullCalendar JS -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+
+
+<!-- SPA Router -->
+<script src="/js/router.js"></script>
+</body>
+</html>

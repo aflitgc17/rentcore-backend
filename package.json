@@ -1,0 +1,24 @@
+{
+  "name": "rentcore-server",
+  "version": "1.0.0",
+  "description": "RentCore backend API server",
+  "main": "src/app.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node src/app.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:reset": "prisma migrate reset --force"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.1",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.1"
+  }
+}

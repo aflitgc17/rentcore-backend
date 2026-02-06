@@ -1,0 +1,35 @@
+<section class="equipment-page">
+
+  <div class="page-header">
+    <h1>장비 목록</h1>
+    <button class="cart-button">
+      🛒 장바구니 (<span id="cart-count">0</span>)
+    </button>
+  </div>
+
+  <div class="search-box">
+    <input id="search-input" placeholder="장비명 또는 관리번호로 검색..." />
+  </div>
+
+  <div class="category-tabs">
+    <button data-category="ALL" class="active">전체</button>
+    <button data-category="CAMERA">카메라</button>
+    <button data-category="TRIPOD">삼각대</button>
+    <button data-category="REFLECTOR">반사판</button>
+  </div>
+
+  <table class="equipment-table">
+    <thead>
+      <tr>
+        <th>사진</th>
+        <th>장비명</th>
+        <th>관리번호</th>
+        <th>상태</th>
+        <th>사용법 & 예약현황</th>
+        <th>장바구니</th>
+      </tr>
+    </thead>
+    <tbody id="equipment-table-body"></tbody>
+  </table>
+
+</section>

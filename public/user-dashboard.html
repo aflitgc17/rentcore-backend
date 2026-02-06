@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>User Dashboard</title>
+</head>
+<body>
+  <div id="app">로딩중...</div>
+
+  <script>
+    // ✅ 이게 뜨면 파일은 정상적으로 열리고 있는 것
+    alert('user-dashboard loaded');
+    console.log('JS 실행됨');
+
+    fetch('/layout.html')
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('layout.html을 불러오지 못했습니다');
+        }
+        return res.text();
+      })
+      .then(html => {
+        // layout.html 전체를 현재 문서에 삽입
+        document.getElementById('app').outerHTML = html;
+
+        // layout.html 안의 <main id="content"> 찾기
+        const content = document.getElementById('content');
+        if (!content) {
+          alert('❌ content 영역을 찾지 못함');
+          return;
+        }
+
+        // 실제 페이지 내용
+        content.innerHTML = `
+          <h1>사용자 대시보드</h1>
+          <p>이 화면이 보이면 레이아웃 연결 성공 🎉</p>
+        `;
+      })
+      .catch(err => {
+        console.error(err);
+        alert(err.message);
+      });
+  </script>
+</body>
+</html>

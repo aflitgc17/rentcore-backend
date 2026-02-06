@@ -1,0 +1,131 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+
+  email       String   @unique
+  password    String
+  name        String // 이름
+
+   // 학생 전용 (관리자는 null 가능)
+  department  String?
+  studentId   String?   @unique // 학번
+  grade       Int? // 학년
+
+  // 관리자/학생 공통
+  birthday    DateTime // 생년월일
+  phoneNumber String   @unique // 전화번호
+
+  role UserRole @default(USER)
+
+  reservations Reservation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model Equipment {
+  id               Int             @id @default(autoincrement())
+  name             String
+  category         String
+  managementNumber String          @unique
+  status           EquipmentStatus @default(AVAILABLE)
+
+  imageUrl  String
+  usageInfo String?
+
+  // ✅ 현재 대여 중인 예약 (1:1)
+  currentRentalId Int?         @unique // 현재 대여 중인 예약
+  currentRental   Reservation? @relation(name: "CurrentRental", fields: [currentRentalId], references: [id])
+
+  isActive Boolean @default(true)
+
+  // ✅ 전체 대여 이력 (1:N)
+  reservations     Reservation[]     @relation(name: "EquipmentReservations")
+  reservationLocks ReservationLock[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum EquipmentStatus {
+  AVAILABLE
+  RENTED
+  BROKEN
+}
+
+model Reservation {
+  id          Int @id @default(autoincrement())
+  userId      Int
+  equipmentId Int
+
+  startDate DateTime
+  endDate   DateTime
+  status    ReservationStatus @default(PENDING)
+
+  rejectReason String?   // 거절 사유
+
+  user User @relation(fields: [userId], references: [id])
+
+  // ✅ 전체 대여 이력용 관계
+  equipment Equipment @relation(name: "EquipmentReservations", fields: [equipmentId], references: [id])
+
+  // 🔹 현재 대여용 (Equipment.currentRental의 역관계)
+  currentRentalOf Equipment? @relation(name: "CurrentRental")
+
+  // ❌ currentRental은 여기서 안 씀 (Equipment 쪽 전용)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum ReservationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+model ReservationLock {
+  id          Int      @id @default(autoincrement())
+  equipmentId Int
+  lockDate    DateTime
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model FacilityReservation {
+  id        Int      @id @default(autoincrement())
+  facility  String   // 편집실 | 녹음실
+  startAt   DateTime
+  endAt     DateTime
+  purpose   String
+  status    String   // pending | approved | rejected
+
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+
+  team      Json
+  createdAt DateTime @default(now())
+}
+
