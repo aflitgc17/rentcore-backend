@@ -83,8 +83,8 @@ model Reservation {
   id          Int @id @default(autoincrement())
   userId      Int
 
-  startDate DateTime
-  endDate   DateTime
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
   originalRequestCreatedAt DateTime?
 
   status    ReservationStatus @default(PENDING)
@@ -173,8 +173,8 @@ model Facility {
 model RentalRequest {
   id     Int          @id @default(autoincrement())
   userId Int
-  from   DateTime
-  to     DateTime
+  from   DateTime @db.Date
+  to     DateTime @db.Date
   subjectName String
   purpose     String
   status RentalStatus @default(REQUESTED)

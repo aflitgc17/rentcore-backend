@@ -114,8 +114,8 @@ body {
 }
 
 .equipment-table img {
-  width: 56px;
-  height: 56px;
+  width: auto;
+  height: auto;
   border-radius: 10px;
 }
 

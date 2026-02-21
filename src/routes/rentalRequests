@@ -84,35 +84,42 @@ router.post("/conflicts", authMiddleware, async (req, res) => {
     const start = new Date(from);
     const end = new Date(to);
 
-    const conflicts = await prisma.reservation.findMany({
+     // 1️⃣ 이미 승인된 예약 검사
+    const approvedConflicts = await prisma.reservationItem.findMany({
       where: {
-        status: "APPROVED",
-
-        // ✅ 장비 조건 (ReservationItem 통해 조회)
-        items: {
-          some: {
-            equipmentId: {
-              in: equipmentIds.map(Number)
-            }
-          }
+        equipmentId: { in: equipmentIds.map(Number) },
+        reservation: {
+          status: "APPROVED",
+          startDate: { lte: end },
+          endDate: { gte: start },
         },
-
-        // ✅ 날짜 겹침 조건
-        AND: [
-          {
-            startDate: { lte: end }
-          },
-          {
-            endDate: { gte: start }
-          }
-        ]
       },
-      include: {
-        items: true
-      }
+      select: { equipmentId: true },
     });
 
-    res.json(conflicts);
+    // 2️⃣ 아직 승인 안 된 신청도 검사
+    const requestedConflicts = await prisma.rentalItem.findMany({
+      where: {
+        equipmentId: { in: equipmentIds.map(Number) },
+        rentalRequest: {
+          status: "REQUESTED",
+          from: { lte: end },
+          to: { gte: start },
+        },
+      },
+      select: { equipmentId: true },
+    });
+
+    // 3️⃣ 겹치는 장비 ID 합치기 + 중복 제거
+    const conflictIds = [
+      ...approvedConflicts.map(c => String(c.equipmentId)),
+      ...requestedConflicts.map(c => String(c.equipmentId)),
+    ];
+
+    const uniqueConflictIds = [...new Set(conflictIds)];
+
+    res.json(uniqueConflictIds);
+
 
   } catch (err) {
     console.error("충돌 확인 에러:", err);
@@ -126,18 +133,36 @@ router.patch("/:id/approve", authMiddleware, adminOnly, async (req, res) => {
   try {
     const id = Number(req.params.id);
 
-    const request = await prisma.rentalRequest.findUnique({
+    // const request = await prisma.rentalRequest.findUnique({
+    //   where: { id },
+    //   include: { items: true },
+    // });
+
+    // if (!request)
+    //   return res.status(404).json({ message: "요청을 찾을 수 없습니다." });
+
+    // if (request.status !== "REQUESTED")
+    //   return res.status(400).json({ message: "이미 처리된 요청입니다." });
+
+    const result = await prisma.$transaction(async (tx) => {
+
+      const request = await tx.rentalRequest.findUnique({
       where: { id },
       include: { items: true },
     });
 
-    if (!request)
-      return res.status(404).json({ message: "요청을 찾을 수 없습니다." });
+    // if (!request)
+    //   return res.status(404).json({ message: "요청을 찾을 수 없습니다." });
 
-    if (request.status !== "REQUESTED")
-      return res.status(400).json({ message: "이미 처리된 요청입니다." });
+    // if (request.status !== "REQUESTED")
+    //   return res.status(400).json({ message: "이미 처리된 요청입니다." });
 
-    const result = await prisma.$transaction(async (tx) => {
+      if (!request)
+          throw new Error("요청을 찾을 수 없습니다.");
+
+      if (request.status !== "REQUESTED")
+        throw new Error("이미 처리된 요청입니다.");
+
 
       // 1️⃣ 충돌 검사
       for (const item of request.items) {
