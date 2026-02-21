@@ -8,9 +8,10 @@
   <div id="app">로딩중...</div>
 
   <script>
-    // ✅ 이게 뜨면 파일은 정상적으로 열리고 있는 것
-    alert('user-dashboard loaded');
-    console.log('JS 실행됨');
+    toast({
+      title: "user-dashboard loaded",
+    });
+  
 
     fetch('/layout.html')
       .then(res => {
@@ -26,7 +27,12 @@
         // layout.html 안의 <main id="content"> 찾기
         const content = document.getElementById('content');
         if (!content) {
-          alert('❌ content 영역을 찾지 못함');
+
+          toast({
+            title: "❌ content 영역을 찾지 못함",
+            // description: "관리자 대시보드로 이동합니다.",
+          });
+          
           return;
         }
 
@@ -38,7 +44,11 @@
       })
       .catch(err => {
         console.error(err);
-        alert(err.message);
+        toast({
+            title: err.message,
+            // description: "관리자 대시보드로 이동합니다.",
+          });
+        
       });
   </script>
 </body>

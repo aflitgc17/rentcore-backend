@@ -14,16 +14,16 @@ datasource db {
 }
 
 model User {
-  id          Int      @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  email       String   @unique
-  password    String
-  name        String // 이름
+  email    String @unique
+  password String
+  name     String // 이름
 
-   // 학생 전용 (관리자는 null 가능)
-  department  String?
-  studentId   String?   @unique // 학번
-  grade       Int? // 학년
+  // 학생 전용 (관리자는 null 가능)
+  department String?
+  studentId  String? @unique // 학번
+  grade      String? // 학년
 
   // 관리자/학생 공통
   birthday    DateTime // 생년월일
@@ -31,7 +31,11 @@ model User {
 
   role UserRole @default(USER)
 
-  reservations Reservation[]
+
+  reservations         Reservation[]
+  facilityReservations FacilityReservation[]
+  rentalRequests       RentalRequest[]
+  notifications Notification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -48,19 +52,22 @@ model Equipment {
   category         String
   managementNumber String          @unique
   status           EquipmentStatus @default(AVAILABLE)
+  assetNumber      String?
+  classification   String?
+  accessories      String?
+  note             String?
+  usageInfo        String?
 
-  imageUrl  String
-  usageInfo String?
-
-  // ✅ 현재 대여 중인 예약 (1:1)
-  currentRentalId Int?         @unique // 현재 대여 중인 예약
-  currentRental   Reservation? @relation(name: "CurrentRental", fields: [currentRentalId], references: [id])
+  // ✅ 현재 대여 중인 예약 (여러 장비가 같은 예약을 공유할 수 있음 → @unique 제거!)
+  currentRentalId Int?
+  // currentRental   Reservation? @relation(name: "CurrentRental", fields: [currentRentalId], references: [id])
 
   isActive Boolean @default(true)
 
   // ✅ 전체 대여 이력 (1:N)
-  reservations     Reservation[]     @relation(name: "EquipmentReservations")
   reservationLocks ReservationLock[]
+  rentalItems      RentalItem[]
+  reservationItems ReservationItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -75,26 +82,34 @@ enum EquipmentStatus {
 model Reservation {
   id          Int @id @default(autoincrement())
   userId      Int
-  equipmentId Int
 
   startDate DateTime
   endDate   DateTime
+  originalRequestCreatedAt DateTime?
+
   status    ReservationStatus @default(PENDING)
 
-  rejectReason String?   // 거절 사유
+  rejectReason String? // 거절 사유
+
+  // ✅ “같은 사람/기간/교과목/목적 = 1건” 이므로 예약 단위로 들고감
+  subjectName String?
+  purpose     String?
 
   user User @relation(fields: [userId], references: [id])
 
-  // ✅ 전체 대여 이력용 관계
-  equipment Equipment @relation(name: "EquipmentReservations", fields: [equipmentId], references: [id])
+  // (선택) 어떤 요청에서 승인되어 만들어졌는지 연결하고 싶으면 추가
+  rentalRequestId Int?
+  rentalRequest   RentalRequest? @relation(fields: [rentalRequestId], references: [id])
 
-  // 🔹 현재 대여용 (Equipment.currentRental의 역관계)
-  currentRentalOf Equipment? @relation(name: "CurrentRental")
+   // ✅ 예약에 포함된 장비들
+  items  ReservationItem[]
 
-  // ❌ currentRental은 여기서 안 씀 (Equipment 쪽 전용)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId, startDate, endDate])
+  @@index([status, startDate])
 }
 
 enum ReservationStatus {
@@ -103,6 +118,21 @@ enum ReservationStatus {
   REJECTED
   CANCELED
 }
+
+
+model ReservationItem {
+  id            Int @id @default(autoincrement())
+  reservationId Int
+  equipmentId   Int
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  equipment   Equipment   @relation(fields: [equipmentId], references: [id])
+
+  @@unique([reservationId, equipmentId]) // 같은 예약에 같은 장비 중복 방지
+  @@index([equipmentId])
+  @@index([reservationId])
+}
+
 
 model ReservationLock {
   id          Int      @id @default(autoincrement())
@@ -115,17 +145,72 @@ model ReservationLock {
 }
 
 model FacilityReservation {
-  id        Int      @id @default(autoincrement())
-  facility  String   // 편집실 | 녹음실
+  id         Int      @id @default(autoincrement())
+  facilityId Int
+  facility   Facility @relation(fields: [facilityId], references: [id])
+
   startAt   DateTime
   endAt     DateTime
   purpose   String
-  status    String   // pending | approved | rejected
+  status    String // pending | approved | rejected
+  headcount Int
 
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
 
   team      Json
   createdAt DateTime @default(now())
 }
 
+model Facility {
+  id        Int      @id @default(autoincrement())
+  name      String // 편집실, 녹음실 등
+  createdAt DateTime @default(now())
+
+  reservations FacilityReservation[]
+}
+
+model RentalRequest {
+  id     Int          @id @default(autoincrement())
+  userId Int
+  from   DateTime
+  to     DateTime
+  subjectName String
+  purpose     String
+  status RentalStatus @default(REQUESTED)
+  rejectionReason String?
+
+  user  User         @relation(fields: [userId], references: [id])
+  items RentalItem[]
+  reservations Reservation[]
+
+  createdAt DateTime @default(now())
+}
+
+enum RentalStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  RENTED
+  RETURNED
+}
+
+model RentalItem {
+  id              Int @id @default(autoincrement())
+  rentalRequestId Int
+  equipmentId     Int
+
+  rentalRequest RentalRequest @relation(fields: [rentalRequestId], references: [id])
+  equipment     Equipment     @relation(fields: [equipmentId], references: [id])
+}
+
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

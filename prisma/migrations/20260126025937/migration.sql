@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE "User" ALTER COLUMN "studentId" DROP NOT NULL,
-ALTER COLUMN "grade" DROP NOT NULL;

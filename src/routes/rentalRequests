@@ -1,0 +1,270 @@
+const express = require("express");
+const router = express.Router();
+
+const { authMiddleware, adminOnly } = require("../middleware/auth");
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
+
+/**
+ * 🔹 사용자 대여 신청
+ * POST /rental-requests
+ */
+router.post("/", authMiddleware, async (req, res) => {
+  try {
+    const { from, to, subjectName, purpose, items } = req.body;
+
+    if (!subjectName || !purpose) {
+      return res.status(400).json({ message: "사용 정보 누락" });
+    }
+
+    const rentalRequest = await prisma.rentalRequest.create({
+      data: {
+        userId: req.user.userId,
+        from: new Date(from),
+        to: new Date(to),
+        subjectName,
+        purpose,
+        status: "REQUESTED",
+        items: {
+          create: items.map(item => ({
+            equipmentId: Number(item.equipmentId)
+          }))
+        }
+      }
+    });
+
+    res.json(rentalRequest);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "대여 신청 실패" });
+  }
+});
+
+/**
+ * 🔹 관리자 전체 요청 조회
+ * GET /rental-requests
+ */
+  router.get("/", authMiddleware, adminOnly, async (req, res) => {
+    try {
+      const { status } = req.query;
+
+      const requests = await prisma.rentalRequest.findMany({
+        where: status ? { status } : {},
+        include: {
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+          items: {
+            include: {
+              equipment: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" }
+      });
+
+      res.json(requests);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "조회 실패" });
+    }
+  });
+
+router.post("/conflicts", authMiddleware, async (req, res) => {
+  try {
+    const { from, to, equipmentIds } = req.body;
+
+    if (!from || !to || !equipmentIds?.length) {
+      return res.status(400).json({ message: "입력값 부족" });
+    }
+
+    const start = new Date(from);
+    const end = new Date(to);
+
+    const conflicts = await prisma.reservation.findMany({
+      where: {
+        status: "APPROVED",
+
+        // ✅ 장비 조건 (ReservationItem 통해 조회)
+        items: {
+          some: {
+            equipmentId: {
+              in: equipmentIds.map(Number)
+            }
+          }
+        },
+
+        // ✅ 날짜 겹침 조건
+        AND: [
+          {
+            startDate: { lte: end }
+          },
+          {
+            endDate: { gte: start }
+          }
+        ]
+      },
+      include: {
+        items: true
+      }
+    });
+
+    res.json(conflicts);
+
+  } catch (err) {
+    console.error("충돌 확인 에러:", err);
+    res.status(500).json({ message: "충돌 확인 실패" });
+  }
+});
+
+
+
+router.patch("/:id/approve", authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    const request = await prisma.rentalRequest.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+
+    if (!request)
+      return res.status(404).json({ message: "요청을 찾을 수 없습니다." });
+
+    if (request.status !== "REQUESTED")
+      return res.status(400).json({ message: "이미 처리된 요청입니다." });
+
+    const result = await prisma.$transaction(async (tx) => {
+
+      // 1️⃣ 충돌 검사
+      for (const item of request.items) {
+        const conflict = await tx.reservationItem.findFirst({
+          where: {
+            equipmentId: item.equipmentId,
+            reservation: {
+              status: "APPROVED",
+              startDate: { lte: request.to },
+              endDate: { gte: request.from },
+            }
+          },
+          include: {
+            reservation: true
+          }
+        });
+
+        if (conflict) {
+          throw new Error(`장비 ${item.equipmentId} 는 이미 예약되어 있습니다.`);
+        }
+      }
+
+      // 2️⃣ rentalRequest 승인
+      const updatedRequest = await tx.rentalRequest.update({
+        where: { id },
+        data: { status: "APPROVED" },
+      });
+
+      // 3️⃣ Reservation 1건 생성
+      const reservation = await tx.reservation.create({
+        data: {
+          userId: request.userId,
+          startDate: request.from,
+          endDate: request.to,
+          status: "APPROVED",
+          subjectName: request.subjectName,
+          purpose: request.purpose,
+          rentalRequestId: request.id,
+          originalRequestCreatedAt: request.createdAt,
+        },
+      });
+
+      // 4️⃣ ReservationItem 여러 개 생성
+      for (const item of request.items) {
+        await tx.reservationItem.create({
+          data: {
+            reservationId: reservation.id,
+            equipmentId: item.equipmentId,
+          },
+        });
+      }
+
+      // 5️⃣ 사용자 알림 생성
+      await tx.notification.create({
+        data: {
+          userId: request.userId,
+          message: `대여 신청이 승인되었습니다.`,
+          isRead: false,
+        },
+      });
+
+      return reservation;
+    });
+
+    res.json({
+      message: "승인 완료",
+      reservation: result,
+    });
+
+
+  } catch (err) {
+    console.error(err);
+
+    if (err.message.includes("이미 예약")) {
+      return res.status(400).json({ message: err.message });
+    }
+
+    res.status(500).json({ message: "승인 실패" });
+
+  }
+});
+
+
+router.patch("/:id/reject", authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { reason } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({ message: "거절 사유 필요" });
+    }
+
+    const request = await prisma.rentalRequest.findUnique({
+      where: { id },
+    });
+
+    if (!request) {
+      return res.status(404).json({ message: "요청 없음" });
+    }
+
+    if (request.status !== "REQUESTED") {
+      return res.status(400).json({ message: "이미 처리됨" });
+    }
+
+    const updated = await prisma.rentalRequest.update({
+      where: { id },
+      data: {
+        status: "REJECTED",
+        rejectionReason: reason,
+      },
+    });
+
+    // 🔥 알림 생성
+    await prisma.notification.create({
+      data: {
+        userId: request.userId,
+        message: `대여 신청이 거절되었습니다. (사유: ${reason})`,
+        isRead: false,
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "거절 실패" });
+  }
+});
+
+
+module.exports = router;

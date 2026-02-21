@@ -1,7 +1,8 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { authMiddleware } = require("../middleware/auth"); 
+const { authMiddleware, adminOnly } = require("../middleware/auth");
+ 
 
 module.exports = (prisma) => {
   const router = express.Router();
@@ -27,6 +28,18 @@ module.exports = (prisma) => {
         return res.status(400).json({ message: "email, password 필수" });
       }
 
+      if (!birthday) {
+      return res.status(400).json({ message: "생년월일 필수" });
+    }
+
+    const parsedBirthday = new Date(birthday);
+
+    if (isNaN(parsedBirthday.getTime())) {
+      return res.status(400).json({ message: "생년월일 형식 오류" });
+    }
+
+    
+
       const hashed = await bcrypt.hash(password, 10);
 
       const user = await prisma.user.create({
@@ -36,8 +49,10 @@ module.exports = (prisma) => {
           password: hashed,
           studentId,
           department,
-          grade,
-          birthday: birthday ? new Date(birthday) : null,
+          // grade,
+          grade: String(grade),
+          // birthday: birthday ? new Date(birthday) : null,
+          birthday: parsedBirthday,
           phoneNumber,
           role: "USER",
         },
@@ -54,6 +69,9 @@ module.exports = (prisma) => {
    * 로그인
    * POST /auth/login
    */
+
+  const cookieParser = require("cookie-parser");
+
   router.post("/login", async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -78,12 +96,24 @@ module.exports = (prisma) => {
         { expiresIn: "1h" }
       );
 
-      res.json({ token, role: user.role });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "로그인 실패" });
-    }
-  });
+      res.cookie("token", token, {
+      httpOnly: true,
+      secure: false,       // 개발환경이면 false
+      sameSite: "lax",
+    });
+
+    // 🔥 token을 JSON에도 포함해서 보내기
+      return res.json({
+        token,
+        role: user.role,
+      });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "로그인 실패" });
+  }
+});
+
 
   /**
  * 내 정보 조회
@@ -113,5 +143,45 @@ router.get("/me", authMiddleware, async (req, res) => {
   }
 });
 
+// router.get("/:id/reservations", async (req, res) => {
+//     try {
+//       const equipmentId = parseInt(req.params.id);
+
+//       const reservations = await prisma.reservation.findMany({
+//         where: {
+//           equipmentId: equipmentId,
+//           status: {
+//             in: ["PENDING", "APPROVED"], // 🔥 승인/대기만 표시
+//           },
+//         },
+//         select: {
+//           startDate: true,
+//           endDate: true,
+//         },
+//       });
+
+//       res.json(reservations);
+//     } catch (err) {
+//       console.error(err);
+//       res.status(500).json({ message: "예약 조회 실패" });
+//     }
+//   });
+
+
+//   router.patch("/rental-requests/:id", authMiddleware, adminOnly, async (req, res) => {
+//   const { status } = req.body;
+
+//   await prisma.rentalRequest.update({
+//     where: { id: Number(req.params.id) },
+//     data: { status }
+//   });
+
+//   res.json({ message: "상태 변경 완료" });
+// });
+
+
+
+
   return router;
 };
+

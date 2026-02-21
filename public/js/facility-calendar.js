@@ -1,3 +1,5 @@
+
+
 // SPA 전용: 즉시 실행
 (function () {
   const el = document.getElementById("calendar");
@@ -21,8 +23,8 @@
     eventClick(info) {
       const e = info.event;
       alert(
-        `장비: ${e.title}\n기간: ${e.startStr} ~ ${e.endStr ?? e.startStr}`
-      );
+        `장비: ${e.title}\n기간: ${e.startStr} ~ ${e.endStr ?? e.startStr}`)
+
     },
   });
 

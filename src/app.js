@@ -1,46 +1,27 @@
 // src/app.js
 require("dotenv").config();
 
-// const { authMiddleware, adminOnly } = require("./middleware/auth");
-
-
-
 // 서버 기본 세팅
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-// require('dotenv').config();
+const bcrypt = require("bcrypt");
+
+const cookieParser = require("cookie-parser");
+
 
 // Prisma 연결
 const {PrismaClient } =require('@prisma/client');
-const prisma =new PrismaClient();
 
 const authRoutes = require('./routes/auth');
+const adminRoutes = require("./routes/admin");
 const { authMiddleware, adminOnly } = require("./middleware/auth");
+const facilityReservationRoutes = require("./routes/facilityReservations");
 
+
+const prisma = new PrismaClient();
 const app = express();
 const PORT = 4000;
-
-// ✅ CORS 설정 (프론트: 3000 → 백: 4000)
-const corsOptions = {
-  origin: "http://localhost:3000",
-  credentials: true,
-  methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
-
-// ✅ preflight(OPTIONS) 먼저 처리
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
-
-app.use(express.json());
-
-
-// ✅ authRoutes는 prisma를 주입해야 함!
-app.use("/auth", authRoutes(prisma));
-
-// 정적 파일 (필요하면 유지)
-app.use(express.static(path.join(__dirname, "../public")));
 
 app.use(
   cors({
@@ -48,18 +29,38 @@ app.use(
     credentials: true,
   })
 );
+app.use(cookieParser());
+
+app.options("*", cors());
+app.use(express.json());
 
 
-// app.use(express.json()); // POST/PUT 대비 OK
+/* ======================
+   라우트 연결
+====================== */
+app.use("/auth", authRoutes(prisma));
+app.use("/admin", adminRoutes);
+app.use("/facility-reservations", facilityReservationRoutes);
+
+const rentalRequestsRoutes = require("./routes/rentalRequests");
+app.use("/rental-requests", rentalRequestsRoutes);
+
+const equipmentRoutes = require("./routes/equipments");
+app.use("/equipments", equipmentRoutes(prisma));
+
+const myRoutes = require("./routes/my");
+app.use("/my", myRoutes);
+
+app.use("/", adminRoutes); 
+
+const reservationRoutes = require("./routes/reservations");
+app.use("/reservations", reservationRoutes);
 
 
-
-// app.use('/auth', authRoutes);
-// app.use('/auth', authRoutes);
-
-
-// app.use(express.static('public'));
-// app.use(express.static(path.join(__dirname, "../public")));
+/* ======================
+   정적 파일
+====================== */
+app.use(express.static(path.join(__dirname, "../public")));
 
 
 // 서버 살아있는지 확인용
@@ -67,24 +68,22 @@ app.get('/health', (req, res) => {
   res.send('RentCore API OK');
 });
 
-
-
-
-const bcrypt = require("bcrypt");
 // 사용자 생성 API
 app.post('/users', async (req, res) => {
   try {
     const { name, email, password, studentId, grade, birthday, phoneNumber } = req.body;
 
-    if (!name || !email) {
-      return res.status(400).json({ message: 'name, email 필수' });
+    if (!name || !email || !password || !studentId || !grade || !birthday || !phoneNumber) {
+      return res.status(400).json({ message: 'name, email, password, studentId, grade, birthday, phoneNumber 필수' });
     }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
       data: {
         name,
         email,
-        hashedPassword,
+        password: hashedPassword,
         studentId,
         grade,
         birthday : new Date(birthday),
@@ -101,10 +100,18 @@ app.post('/users', async (req, res) => {
 
 
 // 장비 목록 조회
-app.get('/equipments',async (req, res) => {
-const equipments =await prisma.equipment.findMany();
-  res.json(equipments);
+app.get("/equipments", async (req, res) => {
+  try {
+    const equipments = await prisma.equipment.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: "asc" },
+    });
+    res.json(equipments);
+  } catch (err) {
+    res.status(500).json({ message: "장비 조회 실패" });
+  }
 });
+
 
 // 특정 장비 조회
 app.get('/equipments/:id', async (req, res) => {
@@ -124,27 +131,41 @@ app.get('/equipments/:id', async (req, res) => {
 });
 
 // 장비 등록
-app.post('/equipments', authMiddleware, adminOnly, async (req, res) => {
-const { name, category, managementNumber, imageUrl } = req.body;
+app.post("/equipments", async (req, res) => {
+  try {
+    const { name, managementNumber, category, status, imageUrl, usageInfo } = req.body;
 
-const equipment =await prisma.equipment.create({
-data: {
-      name,
-      category,
-      managementNumber,
-      imageUrl,
-    },
+    const statusMap = {
+      available: "AVAILABLE",
+      rented: "RENTED",
+      damaged: "BROKEN",
+      reserved: "RENTED",
+    };
+
+    const equipment = await prisma.equipment.create({
+      data: {
+      managementNumber: item.managementNumber,
+      assetNumber: item.assetNumber,
+      classification: item.classification,
+      accessories: item.accessories,
+      note: item.note,
+      category: item.category,
+      status: "AVAILABLE",
+    }
   });
 
-  res.status(201).json(equipment);
+    res.status(201).json(equipment);
+  } catch (err) {
+    res.status(500).json({ message: "장비 등록 실패" });
+  }
 });
 
+
 // 예약 추가
-app.post('/reservations', async (req, res) => {
+app.post('/reservations', authMiddleware, async (req, res) => {
   try {
     const { equipmentId, startDate, endDate } = req.body;
 
-    // const userId = Number(req.headers['x-user-id']);
     const userId = req.user.userId;
 
     if (!equipmentId || !startDate || !endDate || !userId) {
@@ -203,7 +224,7 @@ app.post('/reservations', async (req, res) => {
 });
 
 // 예약 조회(관리자)
-app.get('/reservations', adminOnly, async (req, res) => {
+app.get('/reservations', authMiddleware, adminOnly, async (req, res) => {
   try {
     const reservations = await prisma.reservation.findMany({
       include: {
@@ -234,9 +255,10 @@ app.get('/reservations', adminOnly, async (req, res) => {
 });
 
 // 예약 조회(캘린더)
-app.get('/my/reservations', async (req, res) => {
+app.get('/my/reservations', authMiddleware, async (req, res) => {
   try {
-    const userId = Number(req.headers['req.user.userId']);
+    const userId = req.user?.userId;
+
 
     if (!userId) {
       return res.status(401).json({ message: '로그인이 필요합니다.' });
@@ -255,7 +277,7 @@ app.get('/my/reservations', async (req, res) => {
         },
       },
       orderBy: {
-        startDate: 'desc',
+        startDate: 'asc',
       },
     });
 
@@ -266,7 +288,7 @@ app.get('/my/reservations', async (req, res) => {
   }
 });
 
-app.get('/admin/calendar/reservations', adminOnly, async (req, res) => {
+app.get('/admin/calendar/reservations', authMiddleware, adminOnly, async (req, res) => {
   try {
     const reservations = await prisma.reservation.findMany({
       include: {
@@ -301,9 +323,10 @@ app.get('/admin/calendar/reservations', adminOnly, async (req, res) => {
   }
 });
 
-app.get('/my/calendar/reservations', async (req, res) => {
+app.get('/my/calendar/reservations', authMiddleware, async (req, res) => {
   try {
-    const userId = Number(req.headers['req.user.userId']);
+    const userId = req.user?.userId;
+
 
     if (!userId) {
       return res.status(401).json({ message: '로그인이 필요합니다.' });
@@ -339,7 +362,7 @@ app.get('/my/calendar/reservations', async (req, res) => {
 });
 
 // 예약 승인 API
-app.patch('/reservations/:id/approve', adminOnly, async (req, res) => {
+app.patch('/reservations/:id/approve', authMiddleware, adminOnly, async (req, res) => {
   try {
     const reservationId = Number(req.params.id);
 
@@ -393,7 +416,7 @@ app.patch('/reservations/:id/approve', adminOnly, async (req, res) => {
 
 
 // 예약 거절 API
-app.patch('/reservations/:id/reject', adminOnly, async (req, res) => {
+app.patch('/reservations/:id/reject', authMiddleware, adminOnly, async (req, res) => {
   try {
     const reservationId = Number(req.params.id);
     const { reason } = req.body;
@@ -433,6 +456,216 @@ app.patch('/reservations/:id/reject', adminOnly, async (req, res) => {
     res.status(500).json({ message: '예약 거절 실패' });
   }
 });
+
+app.get("/facility-reservations", authMiddleware, async (req, res) => {
+  const today00 = new Date();
+  today00.setHours(0, 0, 0, 0);
+
+  const reservations = await prisma.facilityReservation.findMany({
+    where: { startAt: { gte: today00 } },
+    orderBy: { startAt: "asc" },
+  });
+
+  res.json(reservations);
+});
+
+app.get("/reservations/calendar", async (req, res) => {
+  try {
+    const reservations = await prisma.reservation.findMany({
+      include: {
+        user: true,
+        items: {             
+          include: {
+            equipment: true,
+          },
+        },
+      },
+    });
+
+    res.json(reservations);
+  } catch (error) {
+    console.error("캘린더 에러:", error);
+    res.status(500).json({ message: "캘린더 조회 실패", error });
+  }
+});
+
+
+app.post("/equipments/bulk", async (req, res) => {
+  try {
+    const equipments = req.body;
+
+    const statusMap = {
+      available: "AVAILABLE",
+      rented: "RENTED",
+      damaged: "BROKEN",
+      reserved: "RENTED",
+    };
+
+    // ✅ 0) 엑셀에 있는 managementNumber 목록
+    const incomingMNs = equipments.map((e) => e.managementNumber);
+
+    // ✅ 1) 엑셀에 없는 장비는 비활성화 (삭제 X)
+    await prisma.equipment.updateMany({
+      where: {
+        managementNumber: { notIn: incomingMNs },
+      },
+      data: { isActive: false },
+    });
+
+    // ✅ 2) 엑셀에 있는 장비는 upsert로 갱신 + 활성화
+    for (const e of equipments) {
+      await prisma.equipment.upsert({
+        where: { managementNumber: e.managementNumber },
+        update: {
+          assetNumber: e.assetNumber || null,
+          classification: e.classification || null,
+          accessories: e.accessories || null,
+          note: e.note || null,
+          category: e.category,
+          name: e.name,
+          status: statusMap[e.status] || "AVAILABLE",
+          isActive: true, // ✅ 활성화
+        },
+        create: {
+          managementNumber: e.managementNumber,
+          assetNumber: e.assetNumber || null,
+          classification: e.classification || null,
+          accessories: e.accessories || null,
+          note: e.note || null,
+          category: e.category,
+          name: e.name,
+          status: statusMap[e.status] || "AVAILABLE",
+          isActive: true, // ✅ 활성화
+        },
+      });
+    }
+
+    res.json({ message: "엑셀 기준으로 동기화 완료(삭제 없이 안전)" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "동기화 실패" });
+  }
+});
+
+
+
+app.put("/equipments/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const {
+      managementNumber,
+      assetNumber,
+      classification,
+      accessories,
+      note,
+      category,
+      name,
+      status,
+    } = req.body;
+
+    const statusMap = {
+      available: "AVAILABLE",
+      rented: "RENTED",
+      damaged: "BROKEN",
+      reserved: "RENTED",
+    };
+
+    const updated = await prisma.equipment.update({
+      where: { id },
+      data: {
+        managementNumber,
+        assetNumber,
+        classification,
+        accessories,
+        note,
+        category,
+        name,
+        status: statusMap[status] || "AVAILABLE",
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "장비 수정 실패" });
+  }
+});
+
+
+// 장비 삭제
+app.delete("/equipments/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    await prisma.equipment.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    res.json({ message: "비활성화 완료" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "장비 삭제 실패" });
+  }
+});
+
+
+// app.get("/equipments/:id/reservations", async (req, res) => {
+//   const equipmentId = Number(req.params.id);
+
+//   const reservations = await prisma.reservation.findMany({
+//     where: { equipmentId },
+//     select: {
+//       startDate: true,
+//       endDate: true,
+//     },
+//   });
+
+//   res.json(reservations);
+// });
+
+// PUT /reservations/:id
+app.put("/reservations/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  const { startDate, endDate, equipmentIds } = req.body;
+
+  await prisma.reservationItem.deleteMany({
+    where: { reservationId: id },
+  });
+
+  const updated = await prisma.reservation.update({
+    where: { id },
+    data: {
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      items: {
+        create: equipmentIds.map((eid) => ({
+          equipmentId: Number(eid),
+        })),
+      },
+    },
+  });
+
+  res.json(updated);
+});
+
+
+
+app.delete("/reservations/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    await prisma.reservation.delete({
+      where: { id },
+    });
+
+    res.json({ message: "삭제 완료" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "삭제 실패" });
+  }
+});
+
 
 
 // 서버 실행
