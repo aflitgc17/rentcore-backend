@@ -179,6 +179,19 @@ router.get("/me", authMiddleware, async (req, res) => {
 //   res.json({ message: "상태 변경 완료" });
 // });
 
+/**
+ * 로그아웃
+ * POST /auth/logout
+ */
+router.post("/logout", (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: false,   // 개발환경
+    sameSite: "lax",
+  });
+
+  return res.json({ message: "로그아웃 성공" });
+});
 
 
 

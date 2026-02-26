@@ -23,27 +23,16 @@ router.get("/status", authMiddleware, async (req, res) => {
       orderBy: { originalRequestCreatedAt: "asc" },
     });
 
-    // 2️⃣ 거절된 신청 이력
-    // const rejectedRequests = await prisma.rentalRequest.findMany({
-    //   where: {
-    //     userId,
-    //     status: "REJECTED",
-    //   },
-    //   // where: { userId },
-    //   include: {
-    //     items: {
-    //       include: {
-    //         equipment: true,
-    //       },
-    //     },
-    //   },
-    //   orderBy: { createdAt: "desc" },
-    // });
 
     const facilities = await prisma.facilityReservation.findMany({
       where: { userId },
+      include: {
+        facility: true,
+      },
       orderBy: { createdAt: "desc" },
     });
+
+    // console.log("시설 응답:", facilities);
 
     const rentalRequests = await prisma.rentalRequest.findMany({
       where: { userId },
@@ -74,8 +63,6 @@ router.get("/notifications", authMiddleware, async (req, res) => {
     orderBy: { createdAt: "desc" },
   });
 
-// console.log("req.user:", req.user);
-// console.log("조회 userId:", req.user.userId);
 
   const normalizeDate = (dateString) => {
   const d = new Date(dateString);
@@ -101,6 +88,30 @@ router.patch("/notifications/read", authMiddleware, async (req, res) => {
   });
 
   res.json({ message: "읽음 처리 완료" });
+});
+
+router.get("/profile", authMiddleware, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: {
+        id: true,
+        name: true,
+        department: true,
+        studentId: true,
+        email: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "사용자를 찾을 수 없습니다." });
+    }
+
+    res.json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "프로필 조회 실패" });
+  }
 });
 
 

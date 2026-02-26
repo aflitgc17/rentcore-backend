@@ -31,7 +31,7 @@ app.use(
 );
 app.use(cookieParser());
 
-app.options("*", cors());
+// app.options("*", cors());
 app.use(express.json());
 
 
@@ -55,6 +55,9 @@ app.use("/", adminRoutes);
 
 const reservationRoutes = require("./routes/reservations");
 app.use("/reservations", reservationRoutes);
+
+const facilitiesRoutes = require("./routes/facilities");
+app.use("/facilities", facilitiesRoutes);
 
 
 /* ======================
@@ -232,13 +235,18 @@ app.get('/reservations', authMiddleware, adminOnly, async (req, res) => {
           select: {
             id: true,
             name: true,
-            email: true,
+            studentId: true,
           },
         },
-        equipment: {
-          select: {
-            id: true,
-            name: true,
+        items: {
+          include: {
+            equipment: {
+              select: {
+                id: true,
+                name: true,
+                managementNumber: true,
+              },
+            },
           },
         },
       },
@@ -650,7 +658,6 @@ app.put("/reservations/:id", async (req, res) => {
 });
 
 
-
 app.delete("/reservations/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -665,6 +672,23 @@ app.delete("/reservations/:id", async (req, res) => {
     res.status(500).json({ message: "삭제 실패" });
   }
 });
+
+// const conflict = await prisma.facilityReservation.findFirst({
+//   where: {
+//     facilityId,
+//     status: "APPROVED",
+//     AND: [
+//       { startAt: { lt: new Date(endAt) } },
+//       { endAt: { gt: new Date(startAt) } },
+//     ],
+//   },
+// });
+
+// if (conflict) {
+//   return res.status(400).json({
+//     message: "이미 해당 시간에 예약이 존재합니다.",
+//   });
+// }
 
 
 

@@ -17,11 +17,14 @@ router.post("/", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "사용 정보 누락" });
     }
 
+    const parsedFrom = new Date(from);
+    const parsedTo = new Date(to);
+
     const rentalRequest = await prisma.rentalRequest.create({
       data: {
         userId: req.user.userId,
-        from: new Date(from),
-        to: new Date(to),
+        from: parsedFrom,
+        to: parsedTo,
         subjectName,
         purpose,
         status: "REQUESTED",
@@ -90,8 +93,8 @@ router.post("/conflicts", authMiddleware, async (req, res) => {
         equipmentId: { in: equipmentIds.map(Number) },
         reservation: {
           status: "APPROVED",
-          startDate: { lte: end },
-          endDate: { gte: start },
+          startDate: { lt: end },
+          endDate: { gt: start },
         },
       },
       select: { equipmentId: true },
@@ -133,29 +136,12 @@ router.patch("/:id/approve", authMiddleware, adminOnly, async (req, res) => {
   try {
     const id = Number(req.params.id);
 
-    // const request = await prisma.rentalRequest.findUnique({
-    //   where: { id },
-    //   include: { items: true },
-    // });
-
-    // if (!request)
-    //   return res.status(404).json({ message: "요청을 찾을 수 없습니다." });
-
-    // if (request.status !== "REQUESTED")
-    //   return res.status(400).json({ message: "이미 처리된 요청입니다." });
-
     const result = await prisma.$transaction(async (tx) => {
 
       const request = await tx.rentalRequest.findUnique({
       where: { id },
       include: { items: true },
     });
-
-    // if (!request)
-    //   return res.status(404).json({ message: "요청을 찾을 수 없습니다." });
-
-    // if (request.status !== "REQUESTED")
-    //   return res.status(400).json({ message: "이미 처리된 요청입니다." });
 
       if (!request)
           throw new Error("요청을 찾을 수 없습니다.");
@@ -171,8 +157,8 @@ router.patch("/:id/approve", authMiddleware, adminOnly, async (req, res) => {
             equipmentId: item.equipmentId,
             reservation: {
               status: "APPROVED",
-              startDate: { lte: request.to },
-              endDate: { gte: request.from },
+              startDate: { lt: request.to },
+              endDate: { gt: request.from },
             }
           },
           include: {

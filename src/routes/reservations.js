@@ -1,8 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
-
+const { authMiddleware } = require("../middleware/auth");
+const { PDFDocument, rgb } = require("pdf-lib");
+const fs = require("fs");
+const path = require("path");
+const fontkit = require("@pdf-lib/fontkit");
 const prisma = new PrismaClient();
+
+
+
 
 /**
  * 🔹 특정 날짜에 예약된 장비 조회
@@ -48,20 +55,15 @@ router.post("/manual", async (req, res) => {
   try {
     const { userId, equipmentIds, startDate, endDate, subjectName, purpose } = req.body;
 
-    console.log("프론트에서 받은 startDate:", startDate);
-    console.log("프론트에서 받은 endDate:", endDate);
-
 
     if (!userId || !equipmentIds || equipmentIds.length === 0) {
       return res.status(400).json({ message: "필수값 누락" });
     }
 
-    const start = startDate;
-    const end = endDate;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
     // end.setDate(end.getDate() + 1);
 
-    console.log("new Date(startDate):", new Date(startDate));
-    console.log("저장 직전 start:", start);
 
     const conflicts = await prisma.reservation.findMany({
       where: {
@@ -77,12 +79,6 @@ router.post("/manual", async (req, res) => {
       include: { items: true }
     });
 
-    console.log("=== 수동 생성 충돌 검사 ===");
-    conflicts.forEach(r => {
-      console.log("id:", r.id);
-      console.log("start:", r.startDate);
-      console.log("end:", r.endDate);
-    });
 
     if (conflicts.length > 0) {
       return res.status(400).json({
@@ -134,8 +130,8 @@ router.put("/:id", async (req, res) => {
     const id = Number(req.params.id);
     const { startDate, endDate, equipmentIds } = req.body;
 
-    const start = startDate;
-    const end = endDate;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
     // end.setDate(end.getDate() + 1);
 
     // 자기 자신 제외하고 충돌 검사
@@ -223,8 +219,18 @@ router.get("/conflicts", async (req, res) => {
   try {
     const { start, end, excludeId } = req.query;
 
+    if (!start || !end) {
+      return res.status(400).json({ message: "start, end 필요" });
+    }
+
     const s = new Date(start);
     const e = new Date(end);
+
+    //  하루 빼기 (올바른 변수 사용)
+    // e.setDate(e.getDate() - 1);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) {
+      return res.status(400).json({ message: "날짜 형식 오류" });
+    }
 
     const conflicts = await prisma.reservation.findMany({
       where: {
@@ -239,21 +245,6 @@ router.get("/conflicts", async (req, res) => {
       include: { items: true }
     });
 
-    console.log("요청 start:", start);
-    console.log("요청 end:", end);
-    console.log("계산된 s:", s);
-    console.log("계산된 e:", e);
-
-    console.log("=== DB에 저장된 기존 예약 ===");
-    const all = await prisma.reservation.findMany({
-      include: { items: true }
-    });
-    all.forEach(r => {
-      console.log("예약ID:", r.id);
-      console.log("start:", r.startDate);
-      console.log("end:", r.endDate);
-    });
-
     const equipmentIds = conflicts.flatMap(r =>
       r.items.map(i => i.equipmentId)
     );
@@ -266,5 +257,132 @@ router.get("/conflicts", async (req, res) => {
   }
 });
 
+router.get("/:id/print", authMiddleware, async (req, res) => {
+  try {
+    // console.log("PRINT 요청 ID:", req.params.id);
+    const reservationId = parseInt(req.params.id);
+
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: {
+        user: true,
+        items: {
+          include: {
+            equipment: true,
+          },
+        },
+      },
+    });
+
+    if (!reservation) {
+      return res.status(404).json({ message: "예약 없음" });
+    }
+    // console.log("조회 결과:", reservation);
+
+    // PDF 템플릿 불러오기
+    const pdfPath = path.join(process.cwd(), "src/templates/rentalForm.pdf");
+    const existingPdfBytes = fs.readFileSync(pdfPath);
+    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+
+    pdfDoc.registerFontkit(fontkit);
+
+    const fontPath = path.join(process.cwd(), "src/fonts/Noto_Sans_KR/NotoSansKR-VariableFont_wght.ttf");
+    const fontBytes = fs.readFileSync(fontPath);
+    const customFont = await pdfDoc.embedFont(fontBytes);
+
+    const page = pdfDoc.getPages()[0];
+
+    const { width, height } = page.getSize();
+    // console.log("PDF width:", width);   
+    // console.log("PDF height:", height); 
+
+    // ===== 사용자 정보 입력 =====
+    page.drawText(reservation.user.department || "", {
+      x: 100,
+      y: height - 120,
+      size: 10,
+      font: customFont,
+    });
+
+    page.drawText(reservation.user.grade || "", {
+      x: 180,
+      y: height - 120,
+      size: 10,
+      font: customFont,
+    });
+
+    page.drawText(reservation.user.studentId || "", {
+      x: 100,
+      y: height - 150,
+      size: 10,
+      font: customFont,
+    });
+
+    page.drawText(reservation.user.name || "", {
+      x: 100,
+      y: height - 180,
+      size: 10,
+      font: customFont,
+    });
+
+    page.drawText(reservation.user.phoneNumber || "", {
+      x: 200,
+      y: height - 180,
+      size: 10,
+      font: customFont,
+    });
+
+    // ===== 사용기간 =====
+    const start = new Date(reservation.startDate);
+    const end = new Date(reservation.endDate);
+
+    page.drawText(
+      `${start.toLocaleDateString()} ${start.toLocaleTimeString()} ~ ${end.toLocaleDateString()} ${end.toLocaleTimeString()}`,
+      {
+        x: 100,
+        y: height - 210,
+        size: 10,
+        font: customFont,
+      }
+    );
+
+    // ===== 장비 목록 =====
+    reservation.items.forEach((item, index) => {
+      page.drawText(item.equipment.managementNumber, {
+        x: 80,
+        y: height - 350 - index * 20,
+        size: 9,
+        font: customFont,
+      });
+
+      page.drawText(item.equipment.name, {
+        x: 130,
+        y: height - 350 - index * 20,
+        size: 9,
+        font: customFont,
+      });
+
+      page.drawText(String(item.quantity), {
+        x: 350,
+        y: height - 350 - index * 20,
+        size: 9,
+        font: customFont,
+      });
+    });
+
+    const pdfBytes = await pdfDoc.save();
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=reservation_${reservationId}.pdf`
+    );
+
+    res.send(Buffer.from(pdfBytes));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "PDF 생성 실패" });
+  }
+});
 
 module.exports = router;
