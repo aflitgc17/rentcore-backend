@@ -136,16 +136,6 @@ router.post("/", authMiddleware, async (req, res) => {
           message: "팀원 학번은 10자리 숫자여야 합니다.",
         });
       }
-
-      const exists = await prisma.user.findUnique({
-        where: { studentId: member.studentId },
-      });
-
-      if (!exists) {
-        return res.status(400).json({
-          message: `등록되지 않은 사용자: ${member.studentId}`,
-        });
-      }
     }
   }
 
@@ -160,15 +150,6 @@ router.post("/", authMiddleware, async (req, res) => {
 
   const startAt = new Date(`${date}T${startTime}:00`);
   const endAt = new Date(`${date}T${endTime}:00`);
-
-    // 1️⃣ facility 이름으로 id 찾기
-    // const facilityRecord = await prisma.facility.findFirst({
-    //   where: { name: facility },
-    // });
-
-    // if (!facilityRecord) {
-    //   return res.status(400).json({ message: "존재하지 않는 시설입니다." });
-    // }
 
     // 2️⃣ facilityId로 저장
     const reservation = await prisma.facilityReservation.create({
@@ -419,22 +400,9 @@ router.post("/manual", authMiddleware, adminOnly, async (req, res) => {
       // 🔥 팀원 검증
       if (team && Array.isArray(team)) {
         for (const member of team) {
-
-          // 1️⃣ 학번 10자리 검사
           if (!/^\d{10}$/.test(member.studentId)) {
             return res.status(400).json({
               message: "팀원 학번은 10자리 숫자여야 합니다.",
-            });
-          }
-
-          // 2️⃣ DB에 존재하는지 검사
-          const exists = await prisma.user.findUnique({
-            where: { studentId: member.studentId },
-          });
-
-          if (!exists) {
-            return res.status(400).json({
-              message: `등록되지 않은 사용자: ${member.studentId}`,
             });
           }
         }

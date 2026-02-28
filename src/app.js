@@ -107,7 +107,7 @@ app.get("/equipments", async (req, res) => {
   try {
     const equipments = await prisma.equipment.findMany({
       where: { isActive: true },
-      orderBy: { createdAt: "asc" },
+      orderBy: { order: "asc" }, 
     });
     res.json(equipments);
   } catch (err) {
@@ -136,7 +136,16 @@ app.get('/equipments/:id', async (req, res) => {
 // 장비 등록
 app.post("/equipments", async (req, res) => {
   try {
-    const { name, managementNumber, category, status, imageUrl, usageInfo } = req.body;
+    const {
+      managementNumber,
+      assetNumber,
+      classification,
+      accessories,
+      note,
+      category,
+      name,
+      status,
+    } = req.body;
 
     const statusMap = {
       available: "AVAILABLE",
@@ -145,17 +154,26 @@ app.post("/equipments", async (req, res) => {
       reserved: "RENTED",
     };
 
+    const last = await prisma.equipment.findFirst({
+      orderBy: { order: "desc" },
+    });
+
+    const nextOrder = last ? last.order + 1 : 0;
+
     const equipment = await prisma.equipment.create({
       data: {
-      managementNumber: item.managementNumber,
-      assetNumber: item.assetNumber,
-      classification: item.classification,
-      accessories: item.accessories,
-      note: item.note,
-      category: item.category,
-      status: "AVAILABLE",
-    }
-  });
+        managementNumber,
+        assetNumber,
+        classification,
+        accessories,
+        note,
+        category,
+        name,
+        status: statusMap[status] || "AVAILABLE",
+        isActive: true,
+        order: nextOrder, // 🔥 자동으로 맨 아래 추가
+      },
+    });
 
     res.status(201).json(equipment);
   } catch (err) {
@@ -521,9 +539,11 @@ app.post("/equipments/bulk", async (req, res) => {
     });
 
     // ✅ 2) 엑셀에 있는 장비는 upsert로 갱신 + 활성화
-    for (const e of equipments) {
+    for (let index = 0; index < equipments.length; index++) {
+      const e = equipments[index];
+
       await prisma.equipment.upsert({
-        where: { managementNumber: e.managementNumber },
+        where: { managementNumber: e.managementNumber.trim().toUpperCase() },
         update: {
           assetNumber: e.assetNumber || null,
           classification: e.classification || null,
@@ -532,7 +552,8 @@ app.post("/equipments/bulk", async (req, res) => {
           category: e.category,
           name: e.name,
           status: statusMap[e.status] || "AVAILABLE",
-          isActive: true, // ✅ 활성화
+          isActive: true,
+          order: index,   // ✅ 엑셀 순서 그대로 저장
         },
         create: {
           managementNumber: e.managementNumber,
@@ -543,7 +564,8 @@ app.post("/equipments/bulk", async (req, res) => {
           category: e.category,
           name: e.name,
           status: statusMap[e.status] || "AVAILABLE",
-          isActive: true, // ✅ 활성화
+          isActive: true,
+          order: index,   // ✅ 엑셀 순서 그대로 저장
         },
       });
     }

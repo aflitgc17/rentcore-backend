@@ -31,6 +31,7 @@ model Equipment {
   name             String
   category         String
   managementNumber String            @unique
+  order            Int               @default(0)
   status           EquipmentStatus   @default(AVAILABLE)
   usageInfo        String?
   currentRentalId  Int?
