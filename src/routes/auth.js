@@ -143,42 +143,6 @@ router.get("/me", authMiddleware, async (req, res) => {
   }
 });
 
-// router.get("/:id/reservations", async (req, res) => {
-//     try {
-//       const equipmentId = parseInt(req.params.id);
-
-//       const reservations = await prisma.reservation.findMany({
-//         where: {
-//           equipmentId: equipmentId,
-//           status: {
-//             in: ["PENDING", "APPROVED"], // 🔥 승인/대기만 표시
-//           },
-//         },
-//         select: {
-//           startDate: true,
-//           endDate: true,
-//         },
-//       });
-
-//       res.json(reservations);
-//     } catch (err) {
-//       console.error(err);
-//       res.status(500).json({ message: "예약 조회 실패" });
-//     }
-//   });
-
-
-//   router.patch("/rental-requests/:id", authMiddleware, adminOnly, async (req, res) => {
-//   const { status } = req.body;
-
-//   await prisma.rentalRequest.update({
-//     where: { id: Number(req.params.id) },
-//     data: { status }
-//   });
-
-//   res.json({ message: "상태 변경 완료" });
-// });
-
 /**
  * 로그아웃
  * POST /auth/logout
