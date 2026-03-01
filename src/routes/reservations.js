@@ -8,9 +8,6 @@ const path = require("path");
 const fontkit = require("@pdf-lib/fontkit");
 const prisma = new PrismaClient();
 
-
-
-
 /**
  * 🔹 특정 날짜에 예약된 장비 조회
  */
@@ -257,6 +254,36 @@ router.get("/conflicts", async (req, res) => {
   }
 });
 
+function fmtShortDateTime(d) {
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  const hh = d.getHours();       
+  const mm = String(d.getMinutes()).padStart(2, "0");
+
+  return `${m}/${day} ${hh}:${mm}`;
+}
+
+function splitDateTime(d) {
+  return {
+    year: d.getFullYear(),
+    month: d.getMonth() + 1,
+    day: d.getDate(),
+    hour: d.getHours(),
+  };
+}
+
+function toHalfWidth(str) {
+  if (!str) return str;
+
+  return str
+    // 전각 영문/숫자 → 반각
+    .replace(/[！-～]/g, ch =>
+      String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)
+    )
+    // 전각 공백 → 일반 공백
+    .replace(/　/g, " ");
+}
+
 router.get("/:id/print", authMiddleware, async (req, res) => {
   try {
     // console.log("PRINT 요청 ID:", req.params.id);
@@ -296,78 +323,220 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
     // console.log("PDF width:", width);   
     // console.log("PDF height:", height); 
 
+    function drawCenteredText(page, text, boxX, boxY, boxWidth, boxHeight, font, size) {
+      if (!text) return;
+
+      const textWidth = font.widthOfTextAtSize(text, size);
+
+      // baseline 보정값 (폰트마다 조금 다름, 0.3~0.35가 적당)
+      const baselineOffset = size * 0.3;
+
+      const x = boxX + (boxWidth - textWidth) / 2;
+      const y = boxY + (boxHeight / 2) - baselineOffset;
+
+      page.drawText(text, { x, y, size, font });
+    }
+
+    function drawWrappedText(page, text, x, y, maxWidth, font, size) {
+      let line = "";
+      let offsetY = 0;
+
+      for (let i = 0; i < text.length; i++) {
+        const testLine = line + text[i];
+        const width = font.widthOfTextAtSize(testLine, size);
+
+        if (width > maxWidth) {
+          page.drawText(line, { x, y: y - offsetY, size, font });
+          line = text[i];
+          offsetY += size + 2;
+        } else {
+          line = testLine;
+        }
+      }
+
+      page.drawText(line, { x, y: y - offsetY, size, font });
+    }
+
     // ===== 사용자 정보 입력 =====
-    page.drawText(reservation.user.department || "", {
-      x: 100,
-      y: height - 120,
-      size: 10,
-      font: customFont,
-    });
+    drawCenteredText(
+      page,
+      reservation.user.department || "",
+      110,                // 칸 왼쪽 x
+      height - 106,      // 칸 아래 y
+      140,               // 칸 너비
+      25,                // 칸 높이
+      customFont,
+      10
+    );
 
-    page.drawText(reservation.user.grade || "", {
-      x: 180,
-      y: height - 120,
-      size: 10,
-      font: customFont,
-    });
+    drawCenteredText(
+      page,
+      reservation.user.grade || "",
+      215,
+      height - 106,
+      60,
+      25,
+      customFont,
+      10
+    );
 
-    page.drawText(reservation.user.studentId || "", {
-      x: 100,
-      y: height - 150,
-      size: 10,
-      font: customFont,
-    });
 
-    page.drawText(reservation.user.name || "", {
-      x: 100,
-      y: height - 180,
-      size: 10,
-      font: customFont,
-    });
+    drawCenteredText(
+      page,
+      reservation.user.studentId || "",
+      170,
+      height - 130,
+      60,
+      25,
+      customFont,
+      10
+    );
 
-    page.drawText(reservation.user.phoneNumber || "", {
-      x: 200,
-      y: height - 180,
-      size: 10,
-      font: customFont,
-    });
+
+    drawCenteredText(
+      page,
+      reservation.user.name || "",
+      170,
+      height - 154,
+      60,
+      25,
+      customFont,
+      10
+    );
+
+
+    drawCenteredText(
+      page,
+      reservation.user.phoneNumber || "",
+      390,
+      height - 154,
+      60,
+      25,
+      customFont,
+      10
+    );
 
     // ===== 사용기간 =====
     const start = new Date(reservation.startDate);
     const end = new Date(reservation.endDate);
 
-    page.drawText(
-      `${start.toLocaleDateString()} ${start.toLocaleTimeString()} ~ ${end.toLocaleDateString()} ${end.toLocaleTimeString()}`,
-      {
-        x: 100,
-        y: height - 210,
-        size: 10,
-        font: customFont,
-      }
-    );
+    const startInfo = splitDateTime(start);
+    const endInfo = splitDateTime(end);
+
+    // ===== 반출 =====
+    page.drawText(String(startInfo.year), {
+      x: 390,
+      y: height - 96,
+      size: 10,
+      font: customFont,
+    });
+
+    page.drawText(String(startInfo.month), {
+      x: 438,
+      y: height - 96,
+      size: 10,
+      font: customFont,
+    });
+
+    page.drawText(String(startInfo.day), {
+      x: 464,
+      y: height - 96,
+      size: 10,
+      font: customFont,
+    });
+
+    page.drawText(String(startInfo.hour), {
+      x: 496,
+      y: height - 96,
+      size: 10,
+      font: customFont,
+    });
+
+
+    // ===== 반납 =====
+    page.drawText(String(endInfo.year), {
+      x: 390,
+      y: height - 120,
+      size: 10,
+      font: customFont,
+    });
+
+    page.drawText(String(endInfo.month), {
+      x: 438,
+      y: height - 120,
+      size: 10,
+      font: customFont,
+    });
+
+    page.drawText(String(endInfo.day), {
+      x: 464,
+      y: height - 120,
+      size: 10,
+      font: customFont,
+    });
+
+    page.drawText(String(endInfo.hour), {
+      x: 496,
+      y: height - 120,
+      size: 10,
+      font: customFont,
+    });
+
+    // ===== 교과목명 =====
+    if (reservation.subjectName) {
+      drawWrappedText(
+        page,
+        reservation.subjectName,
+        173,                // x 위치 (교과목명 칸 시작 위치에 맞게 조절)
+        height - 189,       // y 위치 (템플릿에 맞게 조절 필요)
+        350,                // 최대 너비
+        customFont,
+        10
+      );
+    }
+
+    // ===== 사용 목적 =====
+    if (reservation.purpose) {
+      drawWrappedText(
+        page,
+        reservation.purpose,
+        120,
+        height - 204,
+        350,
+        customFont,
+        10
+      );
+    }
 
     // ===== 장비 목록 =====
     reservation.items.forEach((item, index) => {
-      page.drawText(item.equipment.managementNumber, {
-        x: 80,
-        y: height - 350 - index * 20,
+
+      const isRightColumn = index >= 9;
+
+      const rowIndex = isRightColumn ? index - 9 : index;
+
+      const baseY = height - 295 - rowIndex * 20;
+
+      const managementX = isRightColumn ? 315 : 90;   // 오른쪽 칸 X값 조정
+      const nameX       = isRightColumn ? 360 : 135;  // 오른쪽 칸 X값 조정
+
+      page.drawText(
+        item.equipment.managementNumber || "", {
+        x: managementX,
+        y: baseY,
         size: 9,
         font: customFont,
       });
 
-      page.drawText(item.equipment.name, {
-        x: 130,
-        y: height - 350 - index * 20,
-        size: 9,
-        font: customFont,
-      });
-
-      page.drawText(String(item.quantity), {
-        x: 350,
-        y: height - 350 - index * 20,
-        size: 9,
-        font: customFont,
-      });
+      drawWrappedText(
+        page,
+        toHalfWidth(item.equipment.name || "이름 없음"),
+        nameX,
+        baseY,
+        150,          // 여기: 이름 칸의 최대 너비 (조절 가능)
+        customFont,
+        9
+      );
     });
 
     const pdfBytes = await pdfDoc.save();

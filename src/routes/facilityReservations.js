@@ -80,28 +80,10 @@ router.get("/conflicts", async (req, res) => {
       endAt: { gt: startAt },
     };
 
-    // if (computer) {
-    //   whereClause.computer = computer;
-    // }
-
     const conflicts = await prisma.facilityReservation.findMany({
       where: whereClause,
       include: { user: true },
     });
-
-    // 🔹 1. 시설 이름 → id 조회
-    // const facilityRecord = await prisma.facility.findFirst({
-    //   where: { name: facility },
-    // });
-
-    // if (!facilityRecord) {
-    //   return res.status(400).json({ message: "시설 없음" });
-    // }
-
-
-    // if (facility === "편집실" && computer) {
-    //   whereClause.computer = computer;
-    // }
 
     res.json(conflicts);
   } catch (err) {
@@ -112,7 +94,7 @@ router.get("/conflicts", async (req, res) => {
 
 router.post("/", authMiddleware, async (req, res) => {
   try {
-    // console.log("🔥 [POST BODY]:", req.body);
+    // console.log(" [POST BODY]:", req.body);
     const {
       facilityName,
       date,
@@ -131,9 +113,13 @@ router.post("/", authMiddleware, async (req, res) => {
 
   if (team && Array.isArray(team)) {
     for (const member of team) {
-      if (!/^\d{10}$/.test(member.studentId)) {
+      if (
+        !member.name ||
+        !member.department ||
+        !/^\d{10}$/.test(member.studentId)
+      ) {
         return res.status(400).json({
-          message: "팀원 학번은 10자리 숫자여야 합니다.",
+          message: "팀원 정보가 올바르지 않습니다.",
         });
       }
     }
@@ -157,7 +143,7 @@ router.post("/", authMiddleware, async (req, res) => {
         facilityId: facilityRecord.id,
         startAt,
         endAt,
-        // computer: computer ?? null, 
+        computer: computer ?? null, 
         subjectName,
         purpose,
         status: "REQUESTED",            
@@ -242,6 +228,15 @@ router.get("/pending-count", authMiddleware, async (req, res) => {
   }
 });
 
+function splitDateTime(d) {
+  return {
+    year: d.getFullYear(),
+    month: d.getMonth() + 1,
+    day: d.getDate(),
+    hour: d.getHours(),
+  };
+}
+
 router.get("/:id/print", authMiddleware, async (req, res) => {
   try {
     const reservationId = parseInt(req.params.id);
@@ -262,14 +257,11 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
       return res.status(403).json({ message: "승인된 예약만 출력 가능" });
     }
 
-    // 🔹 시설 종류에 따라 템플릿 선택
-    let pdfPath;
+    const isRecording = reservation.facility.name.includes("녹음");
 
-    if (reservation.facility.name.includes("녹음")) {
-      pdfPath = path.join(process.cwd(), "src/templates/recordingForm.pdf");
-    } else {
-      pdfPath = path.join(process.cwd(), "src/templates/editingForm.pdf");
-    }
+    const pdfPath = isRecording
+      ? path.join(process.cwd(), "src/templates/recordingForm.pdf")
+      : path.join(process.cwd(), "src/templates/editingForm.pdf");
 
     const existingPdfBytes = fs.readFileSync(pdfPath);
     const pdfDoc = await PDFDocument.load(existingPdfBytes);
@@ -284,68 +276,10 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
     const fontBytes = fs.readFileSync(fontPath);
     const customFont = await pdfDoc.embedFont(fontBytes);
 
-    const page = pdfDoc.getPages()[0];
-    const { height } = page.getSize();
-
-    // ===== 사용자 정보 =====
-    page.drawText(reservation.user.department || "", {
-      x: 100,
-      y: height - 120,
-      size: 10,
-      font: customFont,
-    });
-
-    page.drawText(reservation.user.grade || "", {
-      x: 180,
-      y: height - 120,
-      size: 10,
-      font: customFont,
-    });
-
-    page.drawText(reservation.user.studentId || "", {
-      x: 100,
-      y: height - 150,
-      size: 10,
-      font: customFont,
-    });
-
-    page.drawText(reservation.user.name || "", {
-      x: 100,
-      y: height - 180,
-      size: 10,
-      font: customFont,
-    });
-
-    page.drawText(reservation.user.phoneNumber || "", {
-      x: 200,
-      y: height - 180,
-      size: 10,
-      font: customFont,
-    });
-
-    // ===== 사용 기간 =====
-    const start = new Date(reservation.startAt || reservation.start);
-    const end = new Date(reservation.endAt || reservation.end);
-
-    page.drawText(
-      `${start.toLocaleDateString()} ${start.toLocaleTimeString()} 
-       ~ ${end.toLocaleDateString()} ${end.toLocaleTimeString()}`,
-      {
-        x: 100,
-        y: height - 210,
-        size: 10,
-        font: customFont,
-      }
-    );
-
-    // ===== 편집실이면 컴퓨터 표시 =====
-    if (reservation.facility.name.includes("편집")) {
-      page.drawText(reservation.computer || "", {
-        x: 100,
-        y: height - 240,
-        size: 10,
-        font: customFont,
-      });
+    if (isRecording) {
+      await drawRecordingForm(pdfDoc, reservation, customFont);
+    } else {
+      await drawEditingForm(pdfDoc, reservation, customFont);
     }
 
     const pdfBytes = await pdfDoc.save();
@@ -356,13 +290,342 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
       `attachment; filename=facility_${reservationId}.pdf`
     );
 
-    res.send(Buffer.from(pdfBytes));
+        res.send(Buffer.from(pdfBytes));
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "PDF 생성 실패" });
+      }
+    });
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "PDF 생성 실패" });
+function formatKoreanDateTimeRange(start, end) {
+  const pad = (n) => String(n).padStart(2, "0");
+
+  return `${start.getFullYear()} ${start.getMonth() + 1} ${start.getDate()} ${pad(start.getHours())}  ${pad(start.getMinutes())} `
+    + ` ~ `
+    + `${end.getFullYear()} ${end.getMonth() + 1} ${end.getDate()} ${pad(end.getHours())}  ${pad(end.getMinutes())} `;
+}
+
+function splitDateTimeFull(d) {
+  return {
+    year: String(d.getFullYear()),
+    month: String(d.getMonth() + 1),
+    day: String(d.getDate()),
+    hour: String(d.getHours()).padStart(2, "0"),
+    minute: String(d.getMinutes()).padStart(2, "0"),
+  };
+}
+
+function splitSimpleDate(d) {
+  return {
+    year: String(d.getFullYear()),
+    month: String(d.getMonth() + 1),
+    day: String(d.getDate()),
+  };
+}
+
+function drawEditingForm(pdfDoc, reservation, font) {
+  // console.log(" computer raw:", reservation.computer);
+  const page = pdfDoc.getPages()[0];
+  const { height } = page.getSize();
+
+  const start = new Date(reservation.startAt);
+  const end = new Date(reservation.endAt);
+
+  const s = splitDateTimeFull(start);
+  const e = splitDateTimeFull(end);
+
+  const today = new Date();
+  const t = splitSimpleDate(today);
+
+  // 이름
+  page.drawText(reservation.user.name || "", {
+    x: 180,
+    y: height - 129,
+    size: 10,
+    font,
+  });
+
+  // 연락처
+  page.drawText(reservation.user.phoneNumber || "", {
+    x: 155,
+    y: height - 156,
+    size: 10,
+    font,
+  });
+
+  // 학번
+  page.drawText(reservation.user.studentId || "", {
+    x: 330,
+    y: height - 156,
+    size: 10,
+    font,
+  });
+
+  // 학과
+  page.drawText(reservation.user.department || "", {
+    x: 380,
+    y: height - 129,
+    size: 10,
+    font,
+  });
+
+  // 학년
+  page.drawText(reservation.user.grade || "", {
+    x: 490,
+    y: height - 156,
+    size: 10,
+    font,
+  });
+
+  // 컴퓨터 번호 (편집실만)
+
+  const computerPositions = {
+    "편집실1-1": { x: 192, y: height - 183 },
+    "편집실1-2": { x: 295, y: height - 183 },
+    "편집실2-1": { x: 400, y: height - 183 },
+    "편집실2-2": { x: 505, y: height - 183 },
+  };
+
+  //  facility.name 기준으로 동그라미
+  const facilityName = reservation.facility?.name;
+
+  // console.log(" facility name:", facilityName);
+
+  if (facilityName && computerPositions[facilityName]) {
+    const pos = computerPositions[facilityName];
+
+    page.drawCircle({
+      x: pos.x,
+      y: pos.y,
+      size: 6,
+      borderColor: rgb(0, 0, 0),
+      borderWidth: 0,
+    });
   }
-});
+
+  // 사용 시간
+  // ===== 시작 날짜 =====
+  page.drawText(s.year,   { x: 130, y: height - 216, size: 10, font });
+  page.drawText(s.month,  { x: 178, y: height - 216, size: 10, font });
+  page.drawText(s.day,    { x: 213, y: height - 216, size: 10, font });
+  page.drawText(s.hour,   { x: 255, y: height - 216, size: 10, font });
+  page.drawText(s.minute, { x: 283, y: height - 216, size: 10, font });
+
+  // ===== 종료 날짜 =====
+  page.drawText(e.year,   { x: 340, y: height - 216, size: 10, font });
+  page.drawText(e.month,  { x: 388, y: height - 216, size: 10, font });
+  page.drawText(e.day,    { x: 423, y: height - 216, size: 10, font });
+  page.drawText(e.hour,   { x: 465, y: height - 216, size: 10, font });
+  page.drawText(e.minute, { x: 493, y: height - 216, size: 10, font });
+
+  // 교과목명
+  page.drawText(reservation.subjectName || "", {
+    x: 100,
+    y: height - 285,
+    size: 10,
+    font,
+  });
+
+  // 사용목적
+  page.drawText(reservation.purpose || "", {
+    x: 100,
+    y: height - 316,
+    size: 10,
+    font,
+  });
+
+  // 팀원
+    if (reservation.team && reservation.team.length > 0) {
+
+    let nameY = height - 583;     // 이름 시작 위치
+    let idY = height - 583;       // 학번 시작 위치
+    let departmentY = height - 583; 
+
+    reservation.team.forEach((member) => {
+
+      //  이름
+      page.drawText(member.name || "", {
+        x: 473,   // 이름 칸 X좌표
+        y: nameY,
+        size: 10,
+        font,
+      });
+
+      // 학번
+      page.drawText(member.studentId || "", {
+        x: 323,   // 학번 칸 X좌표 (이름과 다르게!)
+        y: idY,
+        size: 10,
+        font,
+      });
+
+      // 학과 
+      page.drawText(member.department || "", {
+        x: 145,
+        y: departmentY,
+        size: 10,
+        font,
+      });
+
+      nameY -= 28;   // 다음 줄
+      idY -= 28;
+      departmentY -= 28;
+    });
+  }
+
+  // 날짜 (년 월 일)
+  page.drawText(t.year,  { x: 163, y: height - 761, size: 12, font });
+  page.drawText(t.month, { x: 213, y: height - 761, size: 12, font });
+  page.drawText(t.day,   { x: 253, y: height - 761, size: 12, font });
+
+  // 신청자 대표 이름
+  page.drawText(reservation.user.name || "", {
+    x: 410,
+    y: height - 761,
+    size: 12,
+    font,
+  });
+}
+
+
+// 녹음실
+function drawRecordingForm(pdfDoc, reservation, font) {
+  const page = pdfDoc.getPages()[0];
+  const { height } = page.getSize();
+
+  const start = new Date(reservation.startAt);
+  const end = new Date(reservation.endAt);
+
+  const s = splitDateTimeFull(start);
+  const e = splitDateTimeFull(end);
+
+  const today = new Date();
+  const t = splitSimpleDate(today);
+
+
+  // 대표자 이름
+  page.drawText(reservation.user.name || "", {
+    x: 200,
+    y: height - 97,
+    size: 10,
+    font,
+  });
+
+  // 학번
+  page.drawText(reservation.user.studentId || "", {
+    x: 324,
+    y: height - 124,
+    size: 10,
+    font,
+  });
+
+  // 연락처
+  page.drawText(reservation.user.phoneNumber || "", {
+    x: 155,
+    y: height - 124,
+    size: 10,
+    font,
+  });
+
+  // 학과
+  page.drawText(reservation.user.department || "", {
+    x: 380,
+    y: height - 97,
+    size: 10,
+    font,
+  });
+
+  // 학년
+  page.drawText(reservation.user.grade || "", {
+    x: 489,
+    y: height - 124,
+    size: 10,
+    font,
+  });
+
+  // 사용 시간
+  // ===== 시작 날짜 =====
+  page.drawText(s.year,   { x: 145, y: height - 150, size: 10, font });
+  page.drawText(s.month,  { x: 193, y: height - 150, size: 10, font });
+  page.drawText(s.day,    { x: 220, y: height - 150, size: 10, font });
+  page.drawText(s.hour,   { x: 260, y: height - 150, size: 10, font });
+  page.drawText(s.minute, { x: 283, y: height - 150, size: 10, font });
+
+  // ===== 종료 날짜 =====
+  page.drawText(e.year,   { x: 340, y: height - 150, size: 10, font });
+  page.drawText(e.month,  { x: 388, y: height - 150, size: 10, font });
+  page.drawText(e.day,    { x: 415, y: height - 150, size: 10, font });
+  page.drawText(e.hour,   { x: 455, y: height - 150, size: 10, font });
+  page.drawText(e.minute, { x: 478, y: height - 150, size: 10, font });
+
+  // 교과목명
+  page.drawText(reservation.subjectName || "", {
+    x: 100,
+    y: height - 212,
+    size: 10,
+    font,
+  });
+
+  // 사용목적
+  page.drawText(reservation.purpose || "", {
+    x: 100,
+    y: height - 242,
+    size: 10,
+    font,
+  });
+
+  // 팀원
+    if (reservation.team && reservation.team.length > 0) {
+
+    let nameY = height - 507;     // 이름 시작 위치
+    let idY = height - 507;       // 학번 시작 위치
+    let departmentY = height - 507; 
+
+    reservation.team.forEach((member) => {
+
+      //  이름
+      page.drawText(member.name || "", {
+        x: 473,   // 이름 칸 X좌표
+        y: nameY,
+        size: 10,
+        font,
+      });
+
+      // 학번
+      page.drawText(member.studentId || "", {
+        x: 323,   // 학번 칸 X좌표 (이름과 다르게!)
+        y: idY,
+        size: 10,
+        font,
+      });
+
+      // 학과 
+      page.drawText(member.department || "", {
+        x: 145,
+        y: departmentY,
+        size: 10,
+        font,
+      });
+
+      nameY -= 25;   // 다음 줄
+      idY -= 25;
+      departmentY -= 25;
+    });
+  }
+
+  // 날짜 (년 월 일)
+  page.drawText(t.year,  { x: 163, y: height - 770, size: 12, font });
+  page.drawText(t.month, { x: 213, y: height - 770, size: 12, font });
+  page.drawText(t.day,   { x: 253, y: height - 770, size: 12, font });
+
+  // 신청자 대표 이름
+  page.drawText(reservation.user.name || "", {
+    x: 400,
+    y: height - 770,
+    size: 12,
+    font,
+  });
+}
 
 router.post("/manual", authMiddleware, adminOnly, async (req, res) => {
     try {
@@ -400,9 +663,13 @@ router.post("/manual", authMiddleware, adminOnly, async (req, res) => {
       // 🔥 팀원 검증
       if (team && Array.isArray(team)) {
         for (const member of team) {
-          if (!/^\d{10}$/.test(member.studentId)) {
+          if (
+            !member.name ||
+            !member.department ||
+            !/^\d{10}$/.test(member.studentId)
+          ) {
             return res.status(400).json({
-              message: "팀원 학번은 10자리 숫자여야 합니다.",
+              message: "팀원 정보가 올바르지 않습니다.",
             });
           }
         }
@@ -434,7 +701,7 @@ router.post("/manual", authMiddleware, adminOnly, async (req, res) => {
 router.put("/:id", authMiddleware, adminOnly, async (req, res) => {
   try {
     const { id } = req.params;
-    const { startAt, endAt } = req.body;
+    const { startAt, endAt, facilityId } = req.body;
 
     const start = new Date(startAt);
     const end = new Date(endAt);
@@ -443,7 +710,6 @@ router.put("/:id", authMiddleware, adminOnly, async (req, res) => {
       return res.status(400).json({ message: "시간 범위 오류" });
     }
 
-    // 🔹 기존 예약 먼저 조회
     const existing = await prisma.facilityReservation.findUnique({
       where: { id: Number(id) },
     });
@@ -452,11 +718,14 @@ router.put("/:id", authMiddleware, adminOnly, async (req, res) => {
       return res.status(404).json({ message: "예약 없음" });
     }
 
-    // 🔹 충돌 검사
+    // 🔥 여기 중요
+    const targetFacilityId = Number(facilityId);
+
+    // 🔹 충돌 검사 (시설도 바뀌는 경우 고려)
     const conflict = await prisma.facilityReservation.findFirst({
       where: {
         id: { not: Number(id) },
-        facilityId: existing.facilityId,
+        facilityId: targetFacilityId,
         status: "APPROVED",
         AND: [
           { startAt: { lt: end } },
@@ -473,7 +742,11 @@ router.put("/:id", authMiddleware, adminOnly, async (req, res) => {
 
     await prisma.facilityReservation.update({
       where: { id: Number(id) },
-      data: { startAt: start, endAt: end },
+      data: {
+        startAt: start,
+        endAt: end,
+        facilityId: targetFacilityId,   // 🔥 이 줄 추가
+      },
     });
 
     res.json({ message: "수정 완료" });
