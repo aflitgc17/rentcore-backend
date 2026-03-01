@@ -284,6 +284,18 @@ function toHalfWidth(str) {
     .replace(/　/g, " ");
 }
 
+function formatPhoneNumber(phone) {
+  if (!phone) return "";
+
+  const digits = phone.replace(/\D/g, "");
+
+  if (digits.length === 11) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  }
+
+  return phone;
+}
+
 router.get("/:id/print", authMiddleware, async (req, res) => {
   try {
     // console.log("PRINT 요청 ID:", req.params.id);
@@ -407,7 +419,7 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
 
     drawCenteredText(
       page,
-      reservation.user.phoneNumber || "",
+      formatPhoneNumber(reservation.user.phoneNumber),
       390,
       height - 154,
       60,
@@ -507,6 +519,29 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
         10
       );
     }
+
+    // ===== 대여 신청 대표자 (하단) =====
+    drawCenteredText(
+      page,
+      reservation.user.name || "",
+      300,              // ← 이름 칸 x좌표 (조절)
+      height - 760,     // ← y좌표 (조절)
+      120,
+      20,
+      customFont,
+      11
+    );
+
+    drawCenteredText(
+      page,
+      reservation.user.studentId || "",
+      414,              // ← 학번 칸 x좌표 (조절)
+      height - 760,
+      120,
+      20,
+      customFont,
+      11
+    );
 
     // ===== 장비 목록 =====
     reservation.items.forEach((item, index) => {

@@ -323,6 +323,37 @@ function splitSimpleDate(d) {
   };
 }
 
+function formatPhoneNumber(phone) {
+  if (!phone) return "";
+
+  // 숫자만 남기기
+  const digits = phone.replace(/\D/g, "");
+
+  if (digits.length === 11) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  }
+
+  return phone; // 길이 이상하면 그냥 원본
+}
+
+
+function drawTextWithSpacing(page, text, x, y, font, size, spacing = 1) {
+  let currentX = x;
+
+  for (const char of text) {
+    page.drawText(char, {
+      x: currentX,
+      y,
+      size,
+      font,
+    });
+
+    const charWidth = font.widthOfTextAtSize(char, size);
+    currentX += charWidth + spacing; // 여기서 자간 조절
+  }
+}
+
+
 function drawEditingForm(pdfDoc, reservation, font) {
   // console.log(" computer raw:", reservation.computer);
   const page = pdfDoc.getPages()[0];
@@ -338,36 +369,48 @@ function drawEditingForm(pdfDoc, reservation, font) {
   const t = splitSimpleDate(today);
 
   // 이름
-  page.drawText(reservation.user.name || "", {
-    x: 180,
-    y: height - 129,
-    size: 10,
+  drawTextWithSpacing(
+    page,
+    reservation.user.name || "",
+    180,
+    height - 129,
     font,
-  });
+    10,
+    0.5  
+  );
 
   // 연락처
-  page.drawText(reservation.user.phoneNumber || "", {
-    x: 155,
-    y: height - 156,
-    size: 10,
+  drawTextWithSpacing(
+    page,
+    formatPhoneNumber(reservation.user.phoneNumber) || "",
+    147,
+    height - 156,
     font,
-  });
-
+    10,
+    0.5  
+  );
+  
   // 학번
-  page.drawText(reservation.user.studentId || "", {
-    x: 330,
-    y: height - 156,
-    size: 10,
+  drawTextWithSpacing(
+    page,
+    reservation.user.studentId || "",
+    330,
+    height - 156,
     font,
-  });
+    10,
+    0.5  
+  );
 
   // 학과
-  page.drawText(reservation.user.department || "", {
-    x: 380,
-    y: height - 129,
-    size: 10,
+  drawTextWithSpacing(
+    page,
+    reservation.user.department || "",
+    380,
+    height - 129,
     font,
-  });
+    10,
+    0.5  
+  );
 
   // 학년
   page.drawText(reservation.user.grade || "", {
@@ -419,20 +462,26 @@ function drawEditingForm(pdfDoc, reservation, font) {
   page.drawText(e.minute, { x: 493, y: height - 216, size: 10, font });
 
   // 교과목명
-  page.drawText(reservation.subjectName || "", {
-    x: 100,
-    y: height - 285,
-    size: 10,
+  drawTextWithSpacing(
+    page,
+    reservation.subjectName || "",
+    100,
+    height - 285,
     font,
-  });
+    10,
+    0.5  
+  );
 
   // 사용목적
-  page.drawText(reservation.purpose || "", {
-    x: 100,
-    y: height - 316,
-    size: 10,
+  drawTextWithSpacing(
+    page,
+    reservation.purpose || "",
+    100,
+    height - 316,
     font,
-  });
+    10,
+    0.5  
+  );
 
   // 팀원
     if (reservation.team && reservation.team.length > 0) {
@@ -444,28 +493,37 @@ function drawEditingForm(pdfDoc, reservation, font) {
     reservation.team.forEach((member) => {
 
       //  이름
-      page.drawText(member.name || "", {
-        x: 473,   // 이름 칸 X좌표
-        y: nameY,
-        size: 10,
+      drawTextWithSpacing(
+        page,
+        member.name || "",
+        458,
+        nameY,
         font,
-      });
+        10,
+        0.5
+      );
 
       // 학번
-      page.drawText(member.studentId || "", {
-        x: 323,   // 학번 칸 X좌표 (이름과 다르게!)
-        y: idY,
-        size: 10,
+      drawTextWithSpacing(
+        page,
+        member.studentId || "",
+        323,
+        idY,
         font,
-      });
+        10,
+        0.5
+      );
 
       // 학과 
-      page.drawText(member.department || "", {
-        x: 145,
-        y: departmentY,
-        size: 10,
+      drawTextWithSpacing(
+        page,
+        member.department || "",
+        135,
+        departmentY,
         font,
-      });
+        10,
+        0.5
+      );
 
       nameY -= 28;   // 다음 줄
       idY -= 28;
@@ -480,7 +538,7 @@ function drawEditingForm(pdfDoc, reservation, font) {
 
   // 신청자 대표 이름
   page.drawText(reservation.user.name || "", {
-    x: 410,
+    x: 378,
     y: height - 761,
     size: 12,
     font,
@@ -504,36 +562,48 @@ function drawRecordingForm(pdfDoc, reservation, font) {
 
 
   // 대표자 이름
-  page.drawText(reservation.user.name || "", {
-    x: 200,
-    y: height - 97,
-    size: 10,
+  drawTextWithSpacing(
+    page,
+    reservation.user.name || "",
+    200,
+    height - 97,
     font,
-  });
+    10,
+    0.5  
+  );
 
   // 학번
-  page.drawText(reservation.user.studentId || "", {
-    x: 324,
-    y: height - 124,
-    size: 10,
+  drawTextWithSpacing(
+    page,
+    reservation.user.studentId || "",
+    324,
+    height - 124,
     font,
-  });
+    10,
+    0.5  
+  );
 
   // 연락처
-  page.drawText(reservation.user.phoneNumber || "", {
-    x: 155,
-    y: height - 124,
-    size: 10,
+  drawTextWithSpacing(
+    page,
+    formatPhoneNumber(reservation.user.phoneNumber) || "",
+    148,
+    height - 124,
     font,
-  });
+    10,
+    0.5  
+  );
 
   // 학과
-  page.drawText(reservation.user.department || "", {
-    x: 380,
-    y: height - 97,
-    size: 10,
+  drawTextWithSpacing(
+    page,
+    reservation.user.department || "",
+    380,
+    height - 97,
     font,
-  });
+    10,
+    0.5  
+  );
 
   // 학년
   page.drawText(reservation.user.grade || "", {
@@ -559,20 +629,26 @@ function drawRecordingForm(pdfDoc, reservation, font) {
   page.drawText(e.minute, { x: 478, y: height - 150, size: 10, font });
 
   // 교과목명
-  page.drawText(reservation.subjectName || "", {
-    x: 100,
-    y: height - 212,
-    size: 10,
+  drawTextWithSpacing(
+    page,
+    reservation.subjectName || "",
+    100,
+    height - 212,
     font,
-  });
+    10,
+    0.5  
+  );
 
   // 사용목적
-  page.drawText(reservation.purpose || "", {
-    x: 100,
-    y: height - 242,
-    size: 10,
+  drawTextWithSpacing(
+    page,
+    reservation.purpose || "",
+    100,
+    height - 242,
     font,
-  });
+    10,
+    0.5  
+  );
 
   // 팀원
     if (reservation.team && reservation.team.length > 0) {
@@ -584,28 +660,37 @@ function drawRecordingForm(pdfDoc, reservation, font) {
     reservation.team.forEach((member) => {
 
       //  이름
-      page.drawText(member.name || "", {
-        x: 473,   // 이름 칸 X좌표
-        y: nameY,
-        size: 10,
+      drawTextWithSpacing(
+        page,
+        member.name || "",
+        458,
+        nameY,
         font,
-      });
+        10,
+        0.5
+      );
 
       // 학번
-      page.drawText(member.studentId || "", {
-        x: 323,   // 학번 칸 X좌표 (이름과 다르게!)
-        y: idY,
-        size: 10,
+      drawTextWithSpacing(
+        page,
+        member.studentId || "",
+        320,
+        idY,
         font,
-      });
+        10,
+        0.5
+      );
 
       // 학과 
-      page.drawText(member.department || "", {
-        x: 145,
-        y: departmentY,
-        size: 10,
+      drawTextWithSpacing(
+        page,
+        member.department || "",
+        138,
+        departmentY,
         font,
-      });
+        10,
+        0.5
+      );
 
       nameY -= 25;   // 다음 줄
       idY -= 25;
@@ -620,7 +705,7 @@ function drawRecordingForm(pdfDoc, reservation, font) {
 
   // 신청자 대표 이름
   page.drawText(reservation.user.name || "", {
-    x: 400,
+    x: 380,
     y: height - 770,
     size: 12,
     font,
