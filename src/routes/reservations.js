@@ -2,11 +2,20 @@ const express = require("express");
 const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
 const { authMiddleware } = require("../middleware/auth");
-const { PDFDocument, rgb } = require("pdf-lib");
 const fs = require("fs");
 const path = require("path");
 const fontkit = require("@pdf-lib/fontkit");
+const {
+  PDFDocument,
+  rgb,
+  StandardFonts,
+  pushGraphicsState,
+  popGraphicsState,
+  setCharacterSpacing,
+  setWordSpacing,
+} = require("pdf-lib");
 const prisma = new PrismaClient();
+
 
 /**
  * 🔹 특정 날짜에 예약된 장비 조회
@@ -284,6 +293,37 @@ function toHalfWidth(str) {
     .replace(/　/g, " ");
 }
 
+function normalizeSpaces(str) {
+  if (!str) return "";
+
+  return str
+    .replace(/\u00A0/g, " ")     // NBSP
+    .replace(/\u200B/g, "")      // zero-width space
+    .replace(/\u2009/g, " ")     // thin space
+    .replace(/\u202F/g, " ")     // narrow no-break space
+    .replace(/\u3000/g, " ")     // 전각 공백
+    .replace(/(\d)\s+(?=\d)/g, "$1") 
+    .replace(/\s+/g, " ")        // 공백 여러개 -> 1개
+    .trim();
+}
+
+function normalizeItemName(str) {
+  if (!str) return "";
+
+  let s = str.normalize("NFKC");
+
+  // 보이지 않는 문자 제거
+  s = s.replace(/[\p{Cf}]/gu, "");
+
+  // 전각 공백 → 일반 공백
+  s = s.replace(/\u3000/g, " ");
+
+  // 여러 공백 → 한 칸
+  s = s.replace(/\s+/g, " ").trim();
+
+  return s;
+}
+
 function formatPhoneNumber(phone) {
   if (!phone) return "";
 
@@ -318,18 +358,31 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
     }
     // console.log("조회 결과:", reservation);
 
-    // PDF 템플릿 불러오기
     const pdfPath = path.join(process.cwd(), "src/templates/rentalForm.pdf");
-    const existingPdfBytes = fs.readFileSync(pdfPath);
-    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+    // 1️⃣ 템플릿 PDF 따로 로드
+    const templatePdfBytes = fs.readFileSync(pdfPath);
+    const templateDoc = await PDFDocument.load(templatePdfBytes);
+
+    // 2️⃣ 새 PDF 생성
+    const pdfDoc = await PDFDocument.create();
+
+    // 3️⃣ 템플릿 페이지 복사
+    const [templatePage] = await pdfDoc.copyPages(templateDoc, [0]);
+
+    // 4️⃣ 새 페이지에 추가
+    const page = pdfDoc.addPage(templatePage);
+
+    // 템플릿을 배경처럼 그리기
+    // page.drawPage(templatePage);
 
     pdfDoc.registerFontkit(fontkit);
 
-    const fontPath = path.join(process.cwd(), "src/fonts/Noto_Sans_KR/NotoSansKR-VariableFont_wght.ttf");
+    const fontPath = path.join(process.cwd(), "src/fonts/Noto_Sans_KR/static/NotoSansKR-Regular.ttf");
     const fontBytes = fs.readFileSync(fontPath);
     const customFont = await pdfDoc.embedFont(fontBytes);
+    const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-    const page = pdfDoc.getPages()[0];
+    // const page = pdfDoc.getPages()[0];
 
     const { width, height } = page.getSize();
     // console.log("PDF width:", width);   
@@ -367,6 +420,83 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
       }
 
       page.drawText(line, { x, y: y - offsetY, size, font });
+    }
+
+    function wrapTextByWidth(text, font, size, maxWidth) {
+      const lines = [];
+      let line = "";
+
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        const test = line + ch;
+        const w = font.widthOfTextAtSize(test, size);
+
+        if (w > maxWidth && line.length > 0) {
+          lines.push(line);
+          line = ch;
+        } else {
+          line = test;
+        }
+      }
+      if (line) lines.push(line);
+      return lines;
+    }
+
+    function ellipsizeToWidth(text, font, size, maxWidth) {
+      const ell = "…";
+      if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+
+      let cut = text;
+      while (cut.length > 0) {
+        const test = cut + ell;
+        if (font.widthOfTextAtSize(test, size) <= maxWidth) return test;
+        cut = cut.slice(0, -1);
+      }
+      return ell;
+    }
+
+    /**
+     * 셀(박스) 안에만 텍스트가 들어가게 출력 (wrap + maxLines + ellipsis)
+     * boxX, boxY는 "박스의 왼쪽 아래" 기준
+     */
+    function drawTextInBox(page, text, boxX, boxY, boxWidth, boxHeight, font, size, options = {}) {
+      if (!text) return;
+
+      const paddingX = options.paddingX ?? 2;
+      const paddingY = options.paddingY ?? 2;
+      const maxLines = options.maxLines ?? 2;
+      const lineHeight = options.lineHeight ?? (size + 1);
+
+      const maxWidth = boxWidth - paddingX * 2;
+      const maxHeight = boxHeight - paddingY * 2;
+
+      // 1) 우선 wrap
+      let lines = wrapTextByWidth(text, font, size, maxWidth);
+
+      // 2) maxLines 제한 + 마지막 줄 … 처리
+      if (lines.length > maxLines) {
+        lines = lines.slice(0, maxLines);
+        lines[maxLines - 1] = ellipsizeToWidth(lines[maxLines - 1], font, size, maxWidth);
+      }
+
+      // 3) 세로로도 박스 넘치면(폰트 너무 큰 경우) 줄수 줄이고 … 처리
+      const fitLines = Math.max(1, Math.floor(maxHeight / lineHeight));
+      if (lines.length > fitLines) {
+        lines = lines.slice(0, fitLines);
+        lines[fitLines - 1] = ellipsizeToWidth(lines[fitLines - 1], font, size, maxWidth);
+      }
+
+      // 4) "박스 안에서 위->아래로" 그리기 (절대 아래칸 침범 안 함)
+      // boxY는 bottom이니까, top = boxY + boxHeight
+      const topY = boxY + boxHeight - paddingY;
+      for (let i = 0; i < lines.length; i++) {
+        page.drawText(lines[i], {
+          x: boxX + paddingX,
+          y: topY - (i + 1) * lineHeight,
+          size,
+          font,
+        });
+      }
     }
 
     // ===== 사용자 정보 입력 =====
@@ -545,33 +675,69 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
 
     // ===== 장비 목록 =====
     reservation.items.forEach((item, index) => {
-
       const isRightColumn = index >= 9;
-
       const rowIndex = isRightColumn ? index - 9 : index;
 
-      const baseY = height - 295 - rowIndex * 20;
+      const rowHeight = 20.3;
 
-      const managementX = isRightColumn ? 315 : 90;   // 오른쪽 칸 X값 조정
-      const nameX       = isRightColumn ? 360 : 135;  // 오른쪽 칸 X값 조정
+      // rowBoxY는 "그 행 칸의 bottom"
+      const rowBoxY = height - 300 - rowIndex * rowHeight;
+      const rowBoxH = rowHeight;
 
-      page.drawText(
-        item.equipment.managementNumber || "", {
+      const managementX = isRightColumn ? 313 : 88;
+      const nameX       = isRightColumn ? 346 : 120;
+
+      // 관리번호(한 줄 고정)
+      page.drawText(item.equipment.managementNumber || "", {
         x: managementX,
-        y: baseY,
+        y: rowBoxY + 5,     // 칸 안에서 적당히
         size: 9,
-        font: customFont,
+        font: helveticaFont,
       });
 
-      drawWrappedText(
-        page,
-        toHalfWidth(item.equipment.name || "이름 없음"),
-        nameX,
-        baseY,
-        150,          // 여기: 이름 칸의 최대 너비 (조절 가능)
-        customFont,
-        9
+      // const before = item.equipment.name || "";
+      // const after  = normalizeItemName(before);
+
+      // console.log("NAME BEFORE:", JSON.stringify(before));
+      // console.log("NAME AFTER :", JSON.stringify(after));
+
+      // const rawName = after;
+
+
+      const rawName = normalizeItemName(item.equipment.name || "이름 없음");
+
+      // 한글 포함 여부 체크 (가-힣, 자모까지 넓게)
+      const hasKorean = /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(rawName);
+
+      const fontToUse = hasKorean ? customFont : helveticaFont;
+
+
+      // const fontToUse = /^[A-Za-z0-9\s\-\.\(\)]+$/.test(rawName)
+      //   ? helveticaFont
+      //   : customFont;
+
+      // const fontToUse = helveticaFont;
+
+      // 🔧 템플릿에서 남아있는 자간/단어간격 리셋
+      page.pushOperators(
+        pushGraphicsState(),
+        setCharacterSpacing(-0.3),
+        setWordSpacing(0),
       );
+
+      // 품목명은 "칸 안에서 2줄까지만", 넘치면 …
+      drawTextInBox(
+        page,
+        rawName,
+        nameX,
+        rowBoxY,
+        150,
+        rowBoxH,
+        fontToUse,
+        8.5,  // 1줄이면 9도 OK (8~9 중 취향)
+        { maxLines: 2, lineHeight: 9, paddingX: 2, paddingY: 1 }
+      );
+      page.pushOperators(popGraphicsState());
     });
 
     const pdfBytes = await pdfDoc.save();

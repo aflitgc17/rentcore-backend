@@ -270,7 +270,7 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
 
     const fontPath = path.join(
       process.cwd(),
-      "src/fonts/Noto_Sans_KR/NotoSansKR-VariableFont_wght.ttf"
+      "src/fonts/Noto_Sans_KR/static/NotoSansKR-Regular.ttf"
     );
 
     const fontBytes = fs.readFileSync(fontPath);
@@ -576,7 +576,7 @@ function drawRecordingForm(pdfDoc, reservation, font) {
   drawTextWithSpacing(
     page,
     reservation.user.studentId || "",
-    324,
+    322,
     height - 124,
     font,
     10,
@@ -587,7 +587,7 @@ function drawRecordingForm(pdfDoc, reservation, font) {
   drawTextWithSpacing(
     page,
     formatPhoneNumber(reservation.user.phoneNumber) || "",
-    148,
+    145,
     height - 124,
     font,
     10,
@@ -598,7 +598,7 @@ function drawRecordingForm(pdfDoc, reservation, font) {
   drawTextWithSpacing(
     page,
     reservation.user.department || "",
-    380,
+    378,
     height - 97,
     font,
     10,
