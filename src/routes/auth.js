@@ -100,6 +100,7 @@ module.exports = (prisma) => {
       httpOnly: true,
       secure: true,       // 개발환경이면 false
       sameSite: "none",
+      path: "/",  
     });
 
     // token을 JSON에도 포함해서 보내기
@@ -152,6 +153,7 @@ router.post("/logout", (req, res) => {
     httpOnly: true,
     secure: true,   // 개발환경
     sameSite: "none",
+    path: "/",     
   });
 
   return res.json({ message: "로그아웃 성공" });
