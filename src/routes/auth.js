@@ -98,11 +98,11 @@ module.exports = (prisma) => {
 
       res.cookie("token", token, {
       httpOnly: true,
-      secure: false,       // 개발환경이면 false
-      sameSite: "lax",
+      secure: true,       // 개발환경이면 false
+      sameSite: "none",
     });
 
-    // 🔥 token을 JSON에도 포함해서 보내기
+    // token을 JSON에도 포함해서 보내기
       return res.json({
         token,
         role: user.role,
@@ -150,8 +150,8 @@ router.get("/me", authMiddleware, async (req, res) => {
 router.post("/logout", (req, res) => {
   res.clearCookie("token", {
     httpOnly: true,
-    secure: false,   // 개발환경
-    sameSite: "lax",
+    secure: true,   // 개발환경
+    sameSite: "none",
   });
 
   return res.json({ message: "로그아웃 성공" });
