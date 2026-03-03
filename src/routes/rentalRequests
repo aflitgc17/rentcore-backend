@@ -87,7 +87,7 @@ router.post("/conflicts", authMiddleware, async (req, res) => {
     const start = new Date(from);
     const end = new Date(to);
 
-     // 1️⃣ 이미 승인된 예약 검사
+     // 이미 승인된 예약 검사
     const approvedConflicts = await prisma.reservationItem.findMany({
       where: {
         equipmentId: { in: equipmentIds.map(Number) },

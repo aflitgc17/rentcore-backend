@@ -21,7 +21,7 @@ const facilityReservationRoutes = require("./routes/facilityReservations");
 
 const prisma = new PrismaClient();
 const app = express();
-const PORT = 4000;
+// const PORT = 4000;
 
 app.use(
   cors({
@@ -715,8 +715,13 @@ app.delete("/reservations/:id", async (req, res) => {
 
 
 // 서버 실행
-app.listen(4000, () => {
-  console.log('RentCore server running on 4000');
-});
+// app.listen(4000, () => {
+//   console.log('RentCore server running on 4000');
+// });
 
+const PORT = process.env.PORT || 4000;
+
+app.listen(PORT, () => {
+  console.log(`RentCore server running on ${PORT}`);
+});
 

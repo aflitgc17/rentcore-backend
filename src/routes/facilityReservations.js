@@ -137,6 +137,24 @@ router.post("/", authMiddleware, async (req, res) => {
   const startAt = new Date(`${date}T${startTime}:00`);
   const endAt = new Date(`${date}T${endTime}:00`);
 
+  // 겹침 검사 (신청 + 승인 둘 다 막기)
+  const conflict = await prisma.facilityReservation.findFirst({
+    where: {
+      facilityId: facilityRecord.id,
+      status: { in: ["REQUESTED", "APPROVED"] },
+      AND: [
+        { startAt: { lt: endAt } },
+        { endAt: { gt: startAt } },
+      ],
+    },
+  });
+
+  if (conflict) {
+    return res.status(400).json({
+      message: "이미 해당 시간에 신청/승인된 예약이 존재합니다.",
+    });
+  }
+
     // 2️⃣ facilityId로 저장
     const reservation = await prisma.facilityReservation.create({
       data: {
@@ -165,12 +183,40 @@ router.patch("/:id/approve", authMiddleware, adminOnly, async (req, res) => {
   try {
     const id = Number(req.params.id);
 
+    const reservation = await prisma.facilityReservation.findUnique({
+      where: { id },
+    });
+
+    if (!reservation) {
+      return res.status(404).json({ message: "예약 없음" });
+    }
+
+    // 🔥 승인 시 겹침 검사 (이미 승인된 것과만 비교)
+    const conflict = await prisma.facilityReservation.findFirst({
+      where: {
+        id: { not: id },
+        facilityId: reservation.facilityId,
+        status: "APPROVED",
+        AND: [
+          { startAt: { lt: reservation.endAt } },
+          { endAt: { gt: reservation.startAt } },
+        ],
+      },
+    });
+
+    if (conflict) {
+      return res.status(400).json({
+        message: "이미 승인된 예약과 시간이 겹칩니다.",
+      });
+    }
+
     const updated = await prisma.facilityReservation.update({
       where: { id },
       data: { status: "APPROVED" },
     });
 
     res.json(updated);
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "승인 실패" });
@@ -731,7 +777,7 @@ router.post("/manual", authMiddleware, adminOnly, async (req, res) => {
       const conflict = await prisma.facilityReservation.findFirst({
         where: {
           facilityId,
-          status: "APPROVED",
+          status: { in: ["REQUESTED", "APPROVED"] },
           AND: [
             { startAt: { lt: end } },
             { endAt: { gt: start } },
@@ -745,7 +791,7 @@ router.post("/manual", authMiddleware, adminOnly, async (req, res) => {
         });
       }
 
-      // 🔥 팀원 검증
+      // 팀원 검증
       if (team && Array.isArray(team)) {
         for (const member of team) {
           if (
@@ -803,7 +849,7 @@ router.put("/:id", authMiddleware, adminOnly, async (req, res) => {
       return res.status(404).json({ message: "예약 없음" });
     }
 
-    // 🔥 여기 중요
+    
     const targetFacilityId = Number(facilityId);
 
     // 🔹 충돌 검사 (시설도 바뀌는 경우 고려)
