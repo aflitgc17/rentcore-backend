@@ -311,5 +311,47 @@ router.get("/notifications/unread-count", authMiddleware, async (req, res) => {
   }
 });
 
+
+router.get("/layout-data", authMiddleware, adminOnly, async (req, res) => {
+  try {
+
+    const userId = req.user.userId;
+
+    // 사용자 정보
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        name: true,
+        email: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "사용자 없음" });
+    }
+
+    // 대여 요청 개수
+    const rentalCount = await prisma.rentalRequest.count({
+      where: { status: "PENDING" },
+    });
+
+    // 시설 요청 개수
+    const facilityCount = await prisma.facilityReservation.count({
+      where: { status: "PENDING" },
+    });
+
+    res.json({
+      user,
+      pendingCount: rentalCount + facilityCount,
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "layout data 실패" });
+  }
+});
+
+
 module.exports = router;
 
