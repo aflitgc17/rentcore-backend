@@ -317,7 +317,6 @@ router.get("/layout-data", authMiddleware, adminOnly, async (req, res) => {
 
     const userId = req.user.userId;
 
-    // 사용자 정보
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -327,27 +326,22 @@ router.get("/layout-data", authMiddleware, adminOnly, async (req, res) => {
       },
     });
 
-    if (!user) {
-      return res.status(404).json({ message: "사용자 없음" });
-    }
-
-    // 대여 요청 개수
-    const rentalCount = await prisma.rentalRequest.count({
-      where: { status: "PENDING" },
-    });
-
-    // 시설 요청 개수
-    const facilityCount = await prisma.facilityReservation.count({
-      where: { status: "PENDING" },
-    });
+    const [rentalCount, facilityCount] = await Promise.all([
+      prisma.rentalRequest.count({
+        where: { status: "REQUESTED" }
+      }),
+      prisma.facilityReservation.count({
+        where: { status: "REQUESTED" }
+      })
+    ]);
 
     res.json({
       user,
-      pendingCount: rentalCount + facilityCount,
+      pendingCount: rentalCount + facilityCount
     });
 
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "layout data 실패" });
   }
 });
