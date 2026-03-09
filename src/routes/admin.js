@@ -209,7 +209,7 @@ router.patch("/rental-requests/:id/approve", authMiddleware, adminOnly, async (r
       data: { status: "APPROVED" },
     });
 
-    // 🔥 알림 생성
+    //  알림 생성
     await prisma.notification.create({
       data: {
         userId: rental.userId,

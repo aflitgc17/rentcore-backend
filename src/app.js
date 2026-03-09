@@ -550,36 +550,58 @@ app.post("/equipments/bulk", async (req, res) => {
     });
 
     // ✅ 2) 엑셀에 있는 장비는 upsert로 갱신 + 활성화
-    for (let index = 0; index < equipments.length; index++) {
-      const e = equipments[index];
+    // 2️⃣ 기존 장비 목록 조회
+    const existing = await prisma.equipment.findMany({
+      select: { managementNumber: true },
+    });
 
-      await prisma.equipment.upsert({
-        where: { managementNumber: e.managementNumber.trim().toUpperCase() },
-        update: {
-          assetNumber: e.assetNumber || null,
-          classification: e.classification || null,
-          accessories: e.accessories || null,
-          note: e.note || null,
-          category: e.category,
-          name: e.name,
-          status: statusMap[e.status] || "AVAILABLE",
-          isActive: true,
-          order: index,   // ✅ 엑셀 순서 그대로 저장
-        },
-        create: {
-          managementNumber: e.managementNumber,
-          assetNumber: e.assetNumber || null,
-          classification: e.classification || null,
-          accessories: e.accessories || null,
-          note: e.note || null,
-          category: e.category,
-          name: e.name,
-          status: statusMap[e.status] || "AVAILABLE",
-          isActive: true,
-          order: index,   // ✅ 엑셀 순서 그대로 저장
-        },
+    const existingSet = new Set(
+      existing.map((e) => e.managementNumber)
+    );
+
+    // 3️⃣ create / update 분리
+    const createData = [];
+    const updateData = [];
+
+    equipments.forEach((e, index) => {
+      const mn = e.managementNumber.trim().toUpperCase();
+
+      const data = {
+        managementNumber: mn,
+        assetNumber: e.assetNumber || null,
+        classification: e.classification || null,
+        accessories: e.accessories || null,
+        note: e.note || null,
+        category: e.category,
+        name: e.name,
+        status: statusMap[e.status] || "AVAILABLE",
+        isActive: true,
+        order: index,
+      };
+
+      if (existingSet.has(mn)) {
+        updateData.push(data);
+      } else {
+        createData.push(data);
+      }
+    });
+
+    // 4️⃣ 새 장비 한번에 insert
+    if (createData.length > 0) {
+      await prisma.equipment.createMany({
+        data: createData,
       });
     }
+
+    // 5️⃣ 기존 장비 업데이트
+    await prisma.$transaction(
+      updateData.map((e) =>
+        prisma.equipment.update({
+          where: { managementNumber: e.managementNumber },
+          data: e,
+        })
+      )
+    );
 
     res.json({ message: "엑셀 기준으로 동기화 완료(삭제 없이 안전)" });
   } catch (err) {
