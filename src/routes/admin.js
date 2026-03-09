@@ -315,15 +315,19 @@ router.get("/notifications/unread-count", authMiddleware, async (req, res) => {
 router.get("/layout-data", authMiddleware, adminOnly, async (req, res) => {
   try {
 
-    const userId = req.user.userId;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ message: "인증 실패" });
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         name: true,
         email: true,
-        role: true,
-      },
+        role: true
+      }
     });
 
     const [rentalCount, facilityCount] = await Promise.all([
@@ -341,7 +345,7 @@ router.get("/layout-data", authMiddleware, adminOnly, async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("layout-data error:", err);
     res.status(500).json({ message: "layout data 실패" });
   }
 });
