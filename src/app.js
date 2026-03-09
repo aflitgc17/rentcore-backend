@@ -556,6 +556,7 @@ app.post("/equipments/bulk", async (req, res) => {
 
   } catch (err) {
     console.error("bulk error:", err);
+
     res.status(500).json({
       message: "동기화 실패",
       error: err.message,
