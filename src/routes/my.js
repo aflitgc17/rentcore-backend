@@ -10,7 +10,7 @@ router.get("/status", authMiddleware, async (req, res) => {
     const userId = req.user.userId;
 
     // 1️⃣ 실제 예약 (관리자가 확정한 것)
-    const reservations = await prisma.reservation.findMany({
+    const reservationsRaw = await prisma.reservation.findMany({
       where: { userId },
       include: {
         rentalRequest: true,
@@ -23,6 +23,16 @@ router.get("/status", authMiddleware, async (req, res) => {
       orderBy: { originalRequestCreatedAt: "asc" },
     });
 
+    const reservations = reservationsRaw.map(r => ({
+      ...r,
+      startTime: r.startDate
+        ? new Date(r.startDate).toTimeString().slice(0,5)
+        : null,
+      endTime: r.endDate
+        ? new Date(r.endDate).toTimeString().slice(0,5)
+        : null,
+    }));
+
 
     const facilities = await prisma.facilityReservation.findMany({
       where: { userId },
@@ -31,8 +41,6 @@ router.get("/status", authMiddleware, async (req, res) => {
       },
       orderBy: { createdAt: "desc" },
     });
-
-    // console.log("시설 응답:", facilities);
 
     const rentalRequests = await prisma.rentalRequest.findMany({
       where: { userId },
