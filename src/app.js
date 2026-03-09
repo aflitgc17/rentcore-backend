@@ -531,12 +531,11 @@ app.post("/equipments/bulk", async (req, res) => {
   try {
     const equipments = req.body;
 
-    // 기존 장비 전부 비활성화
     await prisma.equipment.updateMany({
+      where: { isActive: true },
       data: { isActive: false },
     });
 
-    // 엑셀 장비 한번에 insert
     await prisma.equipment.createMany({
       data: equipments.map((e, index) => ({
         managementNumber: e.managementNumber.trim().toUpperCase(),
@@ -550,19 +549,19 @@ app.post("/equipments/bulk", async (req, res) => {
         isActive: true,
         order: index,
       })),
+      skipDuplicates: true,
     });
 
     res.json({ message: "엑셀 기준 동기화 완료" });
 
   } catch (err) {
-    console.error("🔥 bulk error:", err);
+    console.error( bulk error:", err);
     res.status(500).json({
       message: "동기화 실패",
       error: err.message,
     });
   }
 });
-
 
 
 app.put("/equipments/:id", async (req, res) => {
