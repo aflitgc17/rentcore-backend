@@ -538,10 +538,11 @@ app.post("/equipments/bulk", async (req, res) => {
       reserved: "RENTED",
     };
 
-    // ✅ 0) 엑셀에 있는 managementNumber 목록
-    const incomingMNs = equipments.map((e) => e.managementNumber);
+    const incomingMNs = equipments.map((e) =>
+      e.managementNumber.trim().toUpperCase()
+    );
 
-    // ✅ 1) 엑셀에 없는 장비는 비활성화 (삭제 X)
+    // 1️⃣ 엑셀에 없는 장비 비활성화
     await prisma.equipment.updateMany({
       where: {
         managementNumber: { notIn: incomingMNs },
@@ -549,64 +550,45 @@ app.post("/equipments/bulk", async (req, res) => {
       data: { isActive: false },
     });
 
-    // ✅ 2) 엑셀에 있는 장비는 upsert로 갱신 + 활성화
-    // 2️⃣ 기존 장비 목록 조회
-    const existing = await prisma.equipment.findMany({
-      select: { managementNumber: true },
-    });
-
-    const existingSet = new Set(
-      existing.map((e) => e.managementNumber)
-    );
-
-    // 3️⃣ create / update 분리
-    const createData = [];
-    const updateData = [];
-
-    equipments.forEach((e, index) => {
-      const mn = e.managementNumber.trim().toUpperCase();
-
-      const data = {
-        managementNumber: mn,
-        assetNumber: e.assetNumber || null,
-        classification: e.classification || null,
-        accessories: e.accessories || null,
-        note: e.note || null,
-        category: e.category,
-        name: e.name,
-        status: statusMap[e.status] || "AVAILABLE",
-        isActive: true,
-        order: index,
-      };
-
-      if (existingSet.has(mn)) {
-        updateData.push(data);
-      } else {
-        createData.push(data);
-      }
-    });
-
-    // 4️⃣ 새 장비 한번에 insert
-    if (createData.length > 0) {
-      await prisma.equipment.createMany({
-        data: createData,
-      });
-    }
-
-    // 5️⃣ 기존 장비 업데이트
+    // 2️⃣ 하나씩 upsert (하지만 transaction으로 묶음)
     await prisma.$transaction(
-      updateData.map((e) =>
-        prisma.equipment.update({
-          where: { managementNumber: e.managementNumber },
-          data: e,
+      equipments.map((e, index) =>
+        prisma.equipment.upsert({
+          where: {
+            managementNumber: e.managementNumber.trim().toUpperCase(),
+          },
+          update: {
+            assetNumber: e.assetNumber || null,
+            classification: e.classification || null,
+            accessories: e.accessories || null,
+            note: e.note || null,
+            category: e.category,
+            name: e.name,
+            status: statusMap[e.status] || "AVAILABLE",
+            isActive: true,
+            order: index,
+          },
+          create: {
+            managementNumber: e.managementNumber.trim().toUpperCase(),
+            assetNumber: e.assetNumber || null,
+            classification: e.classification || null,
+            accessories: e.accessories || null,
+            note: e.note || null,
+            category: e.category,
+            name: e.name,
+            status: statusMap[e.status] || "AVAILABLE",
+            isActive: true,
+            order: index,
+          },
         })
       )
     );
 
-    res.json({ message: "엑셀 기준으로 동기화 완료(삭제 없이 안전)" });
+    res.json({ message: "엑셀 기준 동기화 완료" });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "동기화 실패" });
+    console.error(" bulk error:", err);
+    res.status(500).json({ message: "동기화 실패", error: err.message });
   }
 });
 
