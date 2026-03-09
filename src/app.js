@@ -531,19 +531,12 @@ app.post("/equipments/bulk", async (req, res) => {
   try {
     const equipments = req.body;
 
-    const statusMap = {
-      available: "AVAILABLE",
-      rented: "RENTED",
-      damaged: "BROKEN",
-      reserved: "RENTED",
-    };
-
-    // 1️⃣ 기존 장비 전부 비활성화
+    // 기존 장비 전부 비활성화
     await prisma.equipment.updateMany({
       data: { isActive: false },
     });
 
-    // 2️⃣ 엑셀 장비 한번에 insert
+    // 엑셀 장비 한번에 insert
     await prisma.equipment.createMany({
       data: equipments.map((e, index) => ({
         managementNumber: e.managementNumber.trim().toUpperCase(),
@@ -553,7 +546,7 @@ app.post("/equipments/bulk", async (req, res) => {
         note: e.note || null,
         category: e.category,
         name: e.name,
-        status: statusMap[e.status] || "AVAILABLE",
+        status: e.status || "AVAILABLE",
         isActive: true,
         order: index,
       })),
@@ -563,7 +556,10 @@ app.post("/equipments/bulk", async (req, res) => {
 
   } catch (err) {
     console.error("🔥 bulk error:", err);
-    res.status(500).json({ message: "동기화 실패", error: err.message });
+    res.status(500).json({
+      message: "동기화 실패",
+      error: err.message,
+    });
   }
 });
 
