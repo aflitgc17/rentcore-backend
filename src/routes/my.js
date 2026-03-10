@@ -33,6 +33,8 @@ router.get("/status", authMiddleware, async (req, res) => {
     //     : null,
     // }));
 
+    const reservations = reservationsRaw;
+
 
     const facilities = await prisma.facilityReservation.findMany({
       where: { userId },
