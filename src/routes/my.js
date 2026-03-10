@@ -33,7 +33,15 @@ router.get("/status", authMiddleware, async (req, res) => {
     //     : null,
     // }));
 
-    const reservations = reservationsRaw;
+    const reservations = reservationsRaw.map(r => ({
+      ...r,
+      startTime: r.startDate
+        ? r.startDate.toISOString().slice(11,16)
+        : null,
+      endTime: r.endDate
+        ? r.endDate.toISOString().slice(11,16)
+        : null,
+    }));
 
 
     const facilities = await prisma.facilityReservation.findMany({
