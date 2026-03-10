@@ -36,10 +36,10 @@ router.get("/status", authMiddleware, async (req, res) => {
     const reservations = reservationsRaw.map(r => ({
       ...r,
       startTime: r.startDate
-        ? r.startDate.toISOString().slice(11,16)
+        ? r.startDate.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })
         : null,
       endTime: r.endDate
-        ? r.endDate.toISOString().slice(11,16)
+        ? r.endDate.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })
         : null,
     }));
 
