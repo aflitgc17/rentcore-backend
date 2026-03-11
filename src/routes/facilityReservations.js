@@ -406,14 +406,14 @@ function drawTextWithSpacing(page, text, x, y, font, size, spacing = 1) {
   }
 }
 
+function toKST(date) {
+  return new Date(new Date(date).getTime() + 9 * 60 * 60 * 1000);
+}
+
 
 function drawEditingForm(pdfDoc, reservation, font) {
   const page = pdfDoc.getPages()[0];
   const { height } = page.getSize();
-
-  function toKST(date) {
-    return new Date(new Date(date).getTime() + 9 * 60 * 60 * 1000);
-  }
 
   const start = toKST(reservation.startAt);
   const end = toKST(reservation.endAt);
@@ -606,12 +606,8 @@ function drawRecordingForm(pdfDoc, reservation, font) {
   const page = pdfDoc.getPages()[0];
   const { height } = page.getSize();
 
-  function toKST(date) {
-      return new Date(new Date(date).getTime() + 9 * 60 * 60 * 1000);
-    }
-
-    const start = toKST(reservation.startAt);
-    const end = toKST(reservation.endAt);
+  const start = toKST(reservation.startAt);
+  const end = toKST(reservation.endAt);
 
   const s = splitDateTimeFull(start);
   const e = splitDateTimeFull(end);

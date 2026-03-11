@@ -448,6 +448,10 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
       return ell;
     }
 
+    function toKST(date) {
+      return new Date(new Date(date).getTime() + 9 * 60 * 60 * 1000);
+    }
+
     /**
      * 셀(박스) 안에만 텍스트가 들어가게 출력 (wrap + maxLines + ellipsis)
      * boxX, boxY는 "박스의 왼쪽 아래" 기준
@@ -552,8 +556,8 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
     );
 
     // ===== 사용기간 =====
-    const start = new Date(reservation.startDate);
-    const end = new Date(reservation.endDate);
+    const start = toKST(reservation.startDate);
+    const end = toKST(reservation.endDate);
 
     const startInfo = splitDateTime(start);
     const endInfo = splitDateTime(end);
