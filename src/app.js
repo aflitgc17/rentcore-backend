@@ -25,6 +25,8 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:3000",
   "https://rentcore-frontend.vercel.app",
+  "https://rentcore.kr",
+  "https://www.rentcore.kr",
 ];
 
 app.use(
