@@ -94,7 +94,7 @@ router.post("/manual", async (req, res) => {
 
     const created = await prisma.$transaction(async (tx) => {
 
-      // 1️⃣ 예약 1건 생성
+      // 예약 1건 생성
       const reservation = await tx.reservation.create({
         data: {
           userId: Number(userId),
@@ -106,7 +106,7 @@ router.post("/manual", async (req, res) => {
         }
       });
 
-      // 2️⃣ 예약 아이템 생성 (여러 장비)
+      // 예약 아이템 생성 (여러 장비)
       await tx.reservationItem.createMany({
         data: equipmentIds.map(id => ({
           reservationId: reservation.id,
@@ -114,7 +114,7 @@ router.post("/manual", async (req, res) => {
         }))
       });
 
-      // 3️⃣ 장비 현재 대여 상태 업데이트
+      // 장비 현재 대여 상태 업데이트
       await tx.equipment.updateMany({
         where: { id: { in: equipmentIds.map(Number) } },
         data: { currentRentalId: reservation.id }
@@ -138,7 +138,6 @@ router.put("/:id", async (req, res) => {
 
     const start = new Date(startDate);
     const end = new Date(endDate);
-    // end.setDate(end.getDate() + 1);
 
     // 자기 자신 제외하고 충돌 검사
     const conflicts = await prisma.reservation.findMany({
@@ -193,7 +192,7 @@ router.put("/:id", async (req, res) => {
 
 
 /**
- * 🔹 캘린더용 전체 예약 조회
+ *  캘린더용 전체 예약 조회
  */
 router.get("/calendar", async (req, res) => {
   try {
@@ -233,7 +232,6 @@ router.get("/conflicts", async (req, res) => {
     const e = new Date(end);
 
     //  하루 빼기 (올바른 변수 사용)
-    // e.setDate(e.getDate() - 1);
     if (isNaN(s.getTime()) || isNaN(e.getTime())) {
       return res.status(400).json({ message: "날짜 형식 오류" });
     }
@@ -338,7 +336,6 @@ function formatPhoneNumber(phone) {
 
 router.get("/:id/print", authMiddleware, async (req, res) => {
   try {
-    // console.log("PRINT 요청 ID:", req.params.id);
     const reservationId = parseInt(req.params.id);
 
     const reservation = await prisma.reservation.findUnique({
@@ -356,20 +353,19 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
     if (!reservation) {
       return res.status(404).json({ message: "예약 없음" });
     }
-    // console.log("조회 결과:", reservation);
 
     const pdfPath = path.join(process.cwd(), "src/templates/rentalForm.pdf");
-    // 1️⃣ 템플릿 PDF 따로 로드
+    // 템플릿 PDF 따로 로드
     const templatePdfBytes = fs.readFileSync(pdfPath);
     const templateDoc = await PDFDocument.load(templatePdfBytes);
 
-    // 2️⃣ 새 PDF 생성
+    // 새 PDF 생성
     const pdfDoc = await PDFDocument.create();
 
-    // 3️⃣ 템플릿 페이지 복사
+    // 템플릿 페이지 복사
     const [templatePage] = await pdfDoc.copyPages(templateDoc, [0]);
 
-    // 4️⃣ 새 페이지에 추가
+    // 새 페이지에 추가
     const page = pdfDoc.addPage(templatePage);
 
     // 템플릿을 배경처럼 그리기
@@ -382,11 +378,8 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
     const customFont = await pdfDoc.embedFont(fontBytes);
     const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-    // const page = pdfDoc.getPages()[0];
 
     const { width, height } = page.getSize();
-    // console.log("PDF width:", width);   
-    // console.log("PDF height:", height); 
 
     function drawCenteredText(page, text, boxX, boxY, boxWidth, boxHeight, font, size) {
       if (!text) return;
@@ -690,19 +683,10 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
       // 관리번호(한 줄 고정)
       page.drawText(item.equipment.managementNumber || "", {
         x: managementX,
-        y: rowBoxY + 5,     // 칸 안에서 적당히
+        y: rowBoxY + 5,    
         size: 9,
         font: helveticaFont,
       });
-
-      // const before = item.equipment.name || "";
-      // const after  = normalizeItemName(before);
-
-      // console.log("NAME BEFORE:", JSON.stringify(before));
-      // console.log("NAME AFTER :", JSON.stringify(after));
-
-      // const rawName = after;
-
 
       const rawName = normalizeItemName(item.equipment.name || "이름 없음");
 
@@ -711,14 +695,7 @@ router.get("/:id/print", authMiddleware, async (req, res) => {
 
       const fontToUse = hasKorean ? customFont : helveticaFont;
 
-
-      // const fontToUse = /^[A-Za-z0-9\s\-\.\(\)]+$/.test(rawName)
-      //   ? helveticaFont
-      //   : customFont;
-
-      // const fontToUse = helveticaFont;
-
-      // 🔧 템플릿에서 남아있는 자간/단어간격 리셋
+      // 템플릿에서 남아있는 자간/단어간격 리셋
       page.pushOperators(
         pushGraphicsState(),
         setCharacterSpacing(-0.3),

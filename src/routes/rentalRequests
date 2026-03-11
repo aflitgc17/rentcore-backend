@@ -6,7 +6,7 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 /**
- * 🔹 사용자 대여 신청
+ * 사용자 대여 신청
  * POST /rental-requests
  */
 router.post("/", authMiddleware, async (req, res) => {

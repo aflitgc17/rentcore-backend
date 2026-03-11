@@ -60,11 +60,10 @@ router.get("/conflicts", async (req, res) => {
       return res.status(400).json({ message: "필수 값 누락" });
     }
 
-    // 🔹 이름으로 시설 찾기
+    //  이름으로 시설 찾기
     const facilityRecord = await prisma.facility.findFirst({
       where: { name: facilityName },
     });
-    // console.log(" facilityRecord:", facilityRecord);
 
     if (!facilityRecord) {
       return res.status(400).json({ message: "시설 없음" });
@@ -94,7 +93,6 @@ router.get("/conflicts", async (req, res) => {
 
 router.post("/", authMiddleware, async (req, res) => {
   try {
-    // console.log(" [POST BODY]:", req.body);
     const {
       facilityName,
       date,
@@ -125,7 +123,7 @@ router.post("/", authMiddleware, async (req, res) => {
     }
   }
 
-  // 🔹 이름으로 시설 찾기
+  // 이름으로 시설 찾기
   const facilityRecord = await prisma.facility.findFirst({
     where: { name: facilityName },
   });
@@ -155,7 +153,7 @@ router.post("/", authMiddleware, async (req, res) => {
     });
   }
 
-    // 2️⃣ facilityId로 저장
+    // facilityId로 저장
     const reservation = await prisma.facilityReservation.create({
       data: {
         facilityId: facilityRecord.id,
@@ -191,7 +189,7 @@ router.patch("/:id/approve", authMiddleware, adminOnly, async (req, res) => {
       return res.status(404).json({ message: "예약 없음" });
     }
 
-    // 🔥 승인 시 겹침 검사 (이미 승인된 것과만 비교)
+    // 승인 시 겹침 검사 (이미 승인된 것과만 비교)
     const conflict = await prisma.facilityReservation.findFirst({
       where: {
         id: { not: id },
@@ -401,7 +399,6 @@ function drawTextWithSpacing(page, text, x, y, font, size, spacing = 1) {
 
 
 function drawEditingForm(pdfDoc, reservation, font) {
-  // console.log(" computer raw:", reservation.computer);
   const page = pdfDoc.getPages()[0];
   const { height } = page.getSize();
 
@@ -478,7 +475,6 @@ function drawEditingForm(pdfDoc, reservation, font) {
   //  facility.name 기준으로 동그라미
   const facilityName = reservation.facility?.name;
 
-  // console.log(" facility name:", facilityName);
 
   if (facilityName && computerPositions[facilityName]) {
     const pos = computerPositions[facilityName];
