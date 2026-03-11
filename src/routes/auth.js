@@ -100,7 +100,7 @@ module.exports = (prisma) => {
       httpOnly: true,
       secure: true,       // 개발환경이면 false
       sameSite: "none",
-      domain: "rentcore-backend.onrender.com", 
+      // domain: "rentcore-backend.onrender.com", 
       path: "/",  
     });
 
