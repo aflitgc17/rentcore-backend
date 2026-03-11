@@ -64,14 +64,14 @@ router.get("/conflicts", async (req, res) => {
     const facilityRecord = await prisma.facility.findFirst({
       where: { name: facilityName },
     });
-    // console.log("🔥 facilityRecord:", facilityRecord);
+    // console.log(" facilityRecord:", facilityRecord);
 
     if (!facilityRecord) {
       return res.status(400).json({ message: "시설 없음" });
     }
 
-    const startAt = new Date(`${date}T${start}:00`);
-    const endAt = new Date(`${date}T${end}:00`);
+    const startAt = toUTC(date, start);
+    const endAt = toUTC(date, end);
 
     const whereClause = {
       facilityId: facilityRecord.id,
@@ -134,8 +134,8 @@ router.post("/", authMiddleware, async (req, res) => {
     return res.status(400).json({ message: "존재하지 않는 시설입니다." });
   }
 
-  const startAt = new Date(`${date}T${startTime}:00`);
-  const endAt = new Date(`${date}T${endTime}:00`);
+  const startAt = toUTC(date, startTime);
+  const endAt = toUTC(date, endTime);
 
   // 겹침 검사 (신청 + 승인 둘 다 막기)
   const conflict = await prisma.facilityReservation.findFirst({
