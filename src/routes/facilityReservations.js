@@ -11,6 +11,15 @@ const path = require("path");
 const prisma = new PrismaClient();
 const router = express.Router();
 
+function toUTC(date, time) {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+
+  const kst = new Date(year, month - 1, day, hour, minute);
+
+  return new Date(kst.getTime() - 9 * 60 * 60 * 1000);
+}
+
 router.get("/", authMiddleware, async (req, res) => {
   try {
     const { facility } = req.query;
