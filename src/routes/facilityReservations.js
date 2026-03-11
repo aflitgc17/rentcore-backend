@@ -411,8 +411,12 @@ function drawEditingForm(pdfDoc, reservation, font) {
   const page = pdfDoc.getPages()[0];
   const { height } = page.getSize();
 
-  const start = new Date(reservation.startAt);
-  const end = new Date(reservation.endAt);
+  function toKST(date) {
+    return new Date(new Date(date).getTime() + 9 * 60 * 60 * 1000);
+  }
+
+  const start = toKST(reservation.startAt);
+  const end = toKST(reservation.endAt);
 
   const s = splitDateTimeFull(start);
   const e = splitDateTimeFull(end);
@@ -602,8 +606,12 @@ function drawRecordingForm(pdfDoc, reservation, font) {
   const page = pdfDoc.getPages()[0];
   const { height } = page.getSize();
 
-  const start = new Date(reservation.startAt);
-  const end = new Date(reservation.endAt);
+  function toKST(date) {
+      return new Date(new Date(date).getTime() + 9 * 60 * 60 * 1000);
+    }
+
+    const start = toKST(reservation.startAt);
+    const end = toKST(reservation.endAt);
 
   const s = splitDateTimeFull(start);
   const e = splitDateTimeFull(end);
