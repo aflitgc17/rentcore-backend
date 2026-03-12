@@ -866,7 +866,7 @@ router.put("/:id", authMiddleware, adminOnly, async (req, res) => {
       where: {
         id: { not: Number(id) },
         facilityId: targetFacilityId,
-        status: "APPROVED",
+        status: { in: ["REQUESTED", "APPROVED"] }, 
         AND: [
           { startAt: { lt: end } },
           { endAt: { gt: start } },
