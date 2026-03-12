@@ -222,6 +222,15 @@ router.patch("/:id/approve", authMiddleware, adminOnly, async (req, res) => {
       data: { status: "APPROVED" },
     });
 
+    await prisma.notification.create({
+      data: {
+        userId: reservation.userId,
+        title: "시설 예약 승인",
+        message: `${reservation.facility.name} 예약이 승인되었습니다.`,
+        isRead: false,
+      },
+    });
+
     res.json(updated);
 
   } catch (err) {
@@ -244,7 +253,17 @@ router.patch("/:id/reject", authMiddleware, adminOnly, async (req, res) => {
        },
     });
 
+    await prisma.notification.create({
+      data: {
+        userId: reservation.userId,
+        title: "시설 예약 거절",
+        message: `${reservation.facility.name} 예약이 거절되었습니다.`,
+        isRead: false,
+      },
+    });
+
     res.json(updated);
+
   } catch (err) {
     console.error(err);
     console.error("시설 거절 에러:", err);
