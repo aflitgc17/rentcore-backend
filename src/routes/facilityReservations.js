@@ -192,6 +192,9 @@ router.patch("/:id/approve", authMiddleware, adminOnly, async (req, res) => {
 
     const reservation = await prisma.facilityReservation.findUnique({
       where: { id },
+      include: {
+        facility: true
+      }
     });
 
     if (!reservation) {
@@ -244,6 +247,11 @@ router.patch("/:id/reject", authMiddleware, adminOnly, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const { reason } = req.body; 
+
+    const reservation = await prisma.facilityReservation.findUnique({
+      where: { id },
+      include: { facility: true }
+    });
 
     const updated = await prisma.facilityReservation.update({
       where: { id },
